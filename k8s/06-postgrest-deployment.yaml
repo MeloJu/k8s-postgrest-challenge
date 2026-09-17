@@ -3,6 +3,8 @@ kind: Deployment
 metadata:
   name: postgrest
   namespace: desafio-k8s
+  annotations:
+    checkov.io/skip1: CKV_K8S_40=uid 1000 é o usuário não-root definido pela própria imagem do PostgREST (Config.User), mantido para não divergir do upstream
   labels:
     app.kubernetes.io/name: postgrest
     app.kubernetes.io/instance: postgrest
@@ -22,14 +24,24 @@ spec:
         app.kubernetes.io/part-of: k8s-postgrest-challenge
     spec:
       automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 1000
+        # Faz o volume do Secret ser group-owned por 1000, permitindo leitura com 0440.
+        fsGroup: 1000
       containers:
         - name: postgrest
-          # Tag :latest resolvida em 2026-09-17 para PostgREST 16.3 e fixada por
-          # digest, para build reprodutível (ver docs/hardening-producao.md).
+          # Imagem fixada por digest (build reprodutível).
           image: postgrest/postgrest@sha256:ec0e25a4e24b0a3bc5e4f011369bfc736bd1b19f513bd01079b86329a7636962
           imagePullPolicy: Always
+          # Configuração vem de arquivo montado a partir do Secret — a string de
+          # conexão nunca aparece em variável de ambiente nem em `kubectl describe`.
+          command: ["/bin/postgrest"]
+          args: ["/etc/postgrest/postgrest.conf"]
           securityContext:
             allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
             capabilities:
               drop: ["ALL"]
             seccompProfile:
@@ -55,13 +67,19 @@ spec:
               port: 3000
             initialDelaySeconds: 5
             periodSeconds: 5
-          env:
-            - name: PGRST_DB_URI
-              valueFrom:
-                secretKeyRef:
-                  name: postgres-secret
-                  key: DATABASE_URL
-            - name: PGRST_DB_SCHEMA
-              value: "public"
-            - name: PGRST_DB_ANON_ROLE
-              value: "desafio_user"
+          volumeMounts:
+            - name: postgrest-config
+              mountPath: /etc/postgrest
+              readOnly: true
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: postgrest-config
+          secret:
+            secretName: postgres-secret
+            defaultMode: 0440
+            items:
+              - key: postgrest.conf
+                path: postgrest.conf
+        - name: tmp
+          emptyDir: {}

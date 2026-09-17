@@ -1,0 +1,64 @@
+# Segmentação de rede do namespace: nada entra, exceto o que é explicitamente liberado.
+#
+# Nota: a enforcement depende do CNI. O kindnet (padrão do kind) não aplica
+# NetworkPolicy — em cluster local estas regras são declarativas. Em qualquer CNI que
+# as suporte (Calico, Cilium, e os CNIs gerenciados de EKS/GKE/AKS) elas passam a valer
+# sem alteração nos manifests.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny-ingress
+  namespace: desafio-k8s
+  labels:
+    app.kubernetes.io/part-of: k8s-postgrest-challenge
+    app.kubernetes.io/managed-by: kubectl
+spec:
+  podSelector: {}
+  policyTypes:
+    - Ingress
+---
+# O banco só aceita conexões dos Pods da API, e só na porta do Postgres.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: postgres-allow-from-postgrest
+  namespace: desafio-k8s
+  labels:
+    app.kubernetes.io/name: postgres
+    app.kubernetes.io/part-of: k8s-postgrest-challenge
+    app.kubernetes.io/managed-by: kubectl
+spec:
+  podSelector:
+    matchLabels:
+      app: postgres
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app: postgrest
+      ports:
+        - protocol: TCP
+          port: 5432
+---
+# A API é o ponto de entrada do sistema: aceita tráfego HTTP de qualquer origem.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: postgrest-allow-http
+  namespace: desafio-k8s
+  labels:
+    app.kubernetes.io/name: postgrest
+    app.kubernetes.io/part-of: k8s-postgrest-challenge
+    app.kubernetes.io/managed-by: kubectl
+spec:
+  podSelector:
+    matchLabels:
+      app: postgrest
+  policyTypes:
+    - Ingress
+  ingress:
+    - ports:
+        - protocol: TCP
+          port: 3000

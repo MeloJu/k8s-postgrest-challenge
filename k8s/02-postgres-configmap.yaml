@@ -9,15 +9,40 @@ metadata:
     app.kubernetes.io/part-of: k8s-postgrest-challenge
     app.kubernetes.io/managed-by: kubectl
 data:
+  POSTGRES_USER: desafio_user
   POSTGRES_DB: desafio_db
   PGDATA: /var/lib/postgresql/data/pgdata
-  # Executado automaticamente pela imagem oficial do postgres na PRIMEIRA
-  # inicialização do volume (mecanismo /docker-entrypoint-initdb.d/). Garante que
-  # `kubectl apply -f k8s/` sozinho já deixa a tabela pronta, sem passo manual de
-  # `psql` — foi assim que o cd.yml pegou essa lacuna num cluster efêmero do zero.
-  init.sql: |
-    CREATE TABLE IF NOT EXISTS todos (
-      id serial PRIMARY KEY,
-      title text NOT NULL,
-      done boolean NOT NULL DEFAULT false
-    );
+  # Executado pela imagem oficial do postgres na primeira inicialização do volume
+  # (/docker-entrypoint-initdb.d/). É um .sh e não um .sql para ler a senha do
+  # authenticator do arquivo montado pelo Secret — nenhuma credencial neste ConfigMap.
+  init.sh: |
+    #!/bin/bash
+    set -euo pipefail
+
+    authenticator_password="$(cat /run/secrets/postgres/authenticator-password)"
+
+    psql -v ON_ERROR_STOP=1 \
+         -v authenticator_password="$authenticator_password" \
+         --username "$POSTGRES_USER" --dbname "$POSTGRES_DB" <<-'EOSQL'
+      CREATE TABLE IF NOT EXISTS todos (
+        id serial PRIMARY KEY,
+        title text NOT NULL,
+        done boolean NOT NULL DEFAULT false
+      );
+
+      INSERT INTO todos (title, done) VALUES
+        ('Aplicar os manifests com kubectl apply -f k8s/', true),
+        ('Testar a persistencia deletando o Pod do Postgres', false);
+
+      -- Papel das requisições não autenticadas: sem LOGIN e com o mínimo necessário
+      -- para a API funcionar (ler e criar todos), nada além disso.
+      CREATE ROLE web_anon NOLOGIN;
+      GRANT USAGE ON SCHEMA public TO web_anon;
+      GRANT SELECT, INSERT ON todos TO web_anon;
+      GRANT USAGE ON SEQUENCE todos_id_seq TO web_anon;
+
+      -- Papel de conexão da API: existe só para autenticar e trocar de papel.
+      -- NOINHERIT garante que só tenha privilégio após um SET ROLE explícito.
+      CREATE ROLE authenticator LOGIN NOINHERIT PASSWORD :'authenticator_password';
+      GRANT web_anon TO authenticator;
+    EOSQL

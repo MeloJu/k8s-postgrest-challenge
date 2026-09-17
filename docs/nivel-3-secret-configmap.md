@@ -1,128 +1,68 @@
-# Nível 3 — Configuração e segredos
+# 3 — Configuração e credenciais
 
-## Objetivo
+Separação entre o que é configuração (ConfigMap) e o que é credencial (Secret), e como
+cada um é entregue ao container.
 
-Mover as credenciais do PostgreSQL para um Secret e a configuração não sensível para um
-ConfigMap, em vez de deixá-las escritas diretamente no Deployment.
+## ConfigMap
 
-## O que foi feito
+[`k8s/02-postgres-configmap.yaml`](../k8s/02-postgres-configmap.yaml) guarda o que não é
+sensível: nome do banco, usuário, caminho do `PGDATA` e o script de inicialização
+(`init.sh`) que cria a tabela, os papéis de acesso e os dados de exemplo.
 
-### 1. Secret ([`k8s/01-postgres-secret.yaml`](../k8s/01-postgres-secret.yaml))
+## Secret
 
-```yaml
-stringData:
-  POSTGRES_USER: <definido no arquivo aplicado>
-  POSTGRES_PASSWORD: <definido no arquivo aplicado>
-```
+[`k8s/01-postgres-secret.yaml`](../k8s/01-postgres-secret.yaml) guarda três valores: a
+senha do usuário dono do banco, a senha do papel `authenticator` usado pela API, e o
+arquivo de configuração do PostgREST (que contém a string de conexão).
 
-Os valores reais ficam só em [`k8s/01-postgres-secret.yaml`](../k8s/01-postgres-secret.yaml) —
-não repetidos aqui, pra não duplicar a credencial em texto solto pela documentação.
-
-Usei `stringData` (não `data`): o valor fica em texto plano no arquivo, e é o próprio
-`kubectl apply` quem faz a codificação base64 ao enviar pro cluster. Se fosse `data`, cada
-valor precisaria já vir base64-encodado à mão.
-
-### 2. ConfigMap ([`k8s/02-postgres-configmap.yaml`](../k8s/02-postgres-configmap.yaml))
+**Credenciais são entregues como arquivo, não como variável de ambiente:**
 
 ```yaml
-data:
-  POSTGRES_DB: desafio_db
-  PGDATA: /var/lib/postgresql/data/pgdata
+- name: POSTGRES_PASSWORD_FILE
+  value: /run/secrets/postgres/postgres-password
 ```
 
-Nome do banco e caminho do `PGDATA` não são segredo — são só configuração, por isso vão
-num ConfigMap em vez de Secret.
+O Secret é montado em `/run/secrets/postgres` com modo `0440`, e o `fsGroup` do Pod dá
+acesso de leitura apenas ao usuário do container. Variáveis de ambiente vazam com mais
+facilidade — aparecem em `kubectl describe pod`, em dumps de processo (`/proc/<pid>/environ`)
+e em logs de crash de muitas aplicações. Arquivo montado tem superfície menor e é o que a
+imagem oficial do Postgres suporta nativamente através dos sufixos `_FILE`.
 
-### 3. Deployment atualizado ([`k8s/04-postgres-deployment.yaml`](../k8s/04-postgres-deployment.yaml))
+O mesmo vale para a API: a string de conexão do PostgREST vive em
+`/etc/postgrest/postgrest.conf`, montado a partir do Secret — nunca em `env`.
 
-Cada variável de ambiente trocou de um `value:` literal para um `valueFrom`:
+## Base64 não é criptografia
 
-```yaml
-- name: POSTGRES_PASSWORD
-  valueFrom:
-    secretKeyRef:
-      name: postgres-secret
-      key: POSTGRES_PASSWORD
-```
-
-O valor real nunca aparece neste arquivo — só a referência a onde buscá-lo. Reaplicar o
-Deployment com esse env alterado disparou um rolling update automático (o Kubernetes
-recriou o Pod sozinho com as novas variáveis).
+Inspecionando o Secret aplicado, os valores aparecem codificados:
 
 ```bash
-kubectl apply -f k8s/01-postgres-secret.yaml
-kubectl apply -f k8s/02-postgres-configmap.yaml
-kubectl apply -f k8s/04-postgres-deployment.yaml
-kubectl get pods -n desafio-k8s -w
-kubectl exec -it deployment/postgres -n desafio-k8s -- psql -U desafio_user -d desafio_db -c "SELECT current_database();"
+kubectl get secret postgres-secret -n desafio-k8s -o yaml
 ```
 
-## ⚠️ Nota de segurança: por que o Secret está commitado no repositório
+![Secret e decodificação com base64 -d](evidencias/nivel-3-secret-base64-reveal.png)
 
-O arquivo `k8s/01-postgres-secret.yaml` está versionado neste repositório com uma senha
-em texto plano (`stringData`). **Isso não é prática de produção** — é uma decisão
-consciente para este desafio, pelos seguintes motivos:
+Qualquer um reverte isso com `base64 -d`, sem chave nenhuma. Codificação é mudança de
+representação; criptografia exige uma chave para desfazer. O Secret do Kubernetes não
+protege o valor — ele apenas o separa do manifest da aplicação e permite controlar o
+acesso por outros mecanismos:
 
-- A credencial é descartável: protege apenas um PostgreSQL local, dentro de um cluster
-  `kind` que é destruído ao final do exercício. Não há nenhum dado ou sistema real exposto.
-- O próprio critério de aceitação do desafio exige que o avaliador consiga **ver** o
-  Secret no repositório para confirmar que as credenciais saíram do Deployment.
+- **RBAC** restringindo quem faz `get`/`list` em Secrets no namespace.
+- **Encryption at rest** no etcd (não habilitado por padrão em clusters locais).
+- **Gestores externos** (Sealed Secrets, External Secrets Operator, Vault) quando o
+  valor não pode transitar pelo repositório.
 
-Em um ambiente real, nenhuma dessas duas justificativas se sustentaria, e o valor jamais
-deveria ir para o Git — nem em repositório privado. As alternativas usadas na indústria:
+## Credenciais neste repositório
 
-- **Não versionar o valor**: o pipeline de CI/CD injeta a credencial em tempo de deploy
-  (a partir de um segredo do próprio GitHub Actions, por exemplo), e só a existência do
-  Secret — não seu conteúdo — fica no manifest.
-- **Sealed Secrets** (Bitnami): o valor é criptografado com uma chave pública antes do
-  commit; só o controller rodando dentro do cluster (dono da chave privada) consegue
-  decifrar. O que entra no Git é cifra de verdade, não base64.
-- **External Secrets Operator / Vault**: o cluster busca a credencial de um cofre externo
-  (AWS Secrets Manager, HashiCorp Vault) em tempo de execução — o Git nunca guarda o valor,
-  só uma referência a onde buscá-lo.
+As credenciais versionadas aqui são de demonstração e existem para que
+`kubectl apply -f k8s/` funcione em qualquer clone sem passo manual — prática comum em
+repositórios de referência. Elas não dão acesso a nenhum recurso real: o banco é local,
+sem exposição externa, e o papel usado pela API tem privilégio mínimo
+([nível 4](nivel-4-postgrest-integracao.md)).
 
-Essa mesma tensão vai aparecer de novo quando o `ci.yml` (com Checkov) for montado: a
-ferramenta provavelmente vai sinalizar este arquivo como um finding de "Secret em texto
-plano". O tratamento correto não é silenciar o alerta, e sim documentá-lo como um risco
-aceito e justificado — que é exatamente o que esta seção está fazendo.
+Em um ambiente com dados reais, o valor não iria para o Git: o pipeline injetaria a
+credencial no momento do deploy, ou o cluster a buscaria de um gestor externo, mantendo
+no repositório apenas a referência.
 
-## Evidências
+## Evidência
 
-Estado do cluster após a migração para Secret/ConfigMap, e conexão confirmada com as
-credenciais vindas do Secret:
-
-![Pods, Secret, ConfigMap e conferência via psql](evidencias/nivel-3-secret-configmap.png)
-
-O Secret "cru" (`-o yaml`) e a prova de que o base64 é trivialmente reversível:
-
-![Secret decodificado com base64 -d](evidencias/nivel-3-secret-base64-reveal.png)
-
-## Reflexão
-
-**Ao inspecionar o Secret com `-o yaml`, o valor aparece "embaralhado". Isso é
-criptografia de verdade ou apenas codificação? O que isso significa para a segurança
-real?**
-
-É apenas codificação — base64, não criptografia. A diferença é fundamental: criptografia
-exige uma chave para reverter o processo; codificação é só uma troca de representação,
-reversível por qualquer um, sem chave nenhuma.
-
-A prova está na própria evidência acima: o valor codificado do Secret volta a ser a senha
-original com um único comando, `base64 -d`, sem nenhuma chave adicional (os valores em si
-não são repetidos aqui em texto — só na imagem, que já é a evidência do comando real).
-Qualquer pessoa com permissão de leitura sobre o objeto Secret (ou acesso direto ao etcd,
-onde o cluster armazena esses dados) recupera a credencial original instantaneamente.
-
-O que isso significa na prática: o Secret do Kubernetes **não protege o valor em si** —
-ele só evita que a credencial apareça *acidentalmente* em `kubectl get -o yaml` de outros
-recursos, ou hardcoded dentro de um Deployment. A segurança real de um Secret vem de
-controles em volta dele, não do formato do dado:
-
-- **RBAC** restringindo quem pode fazer `get`/`list` em Secrets no namespace.
-- **Encryption at rest** no etcd (não habilitado por padrão em clusters locais como o `kind`).
-- **Ferramentas externas** (Sealed Secrets, Vault, External Secrets Operator) para nunca
-  deixar o valor em texto plano acessível via `kubectl` nem versionado em Git.
-
-Sem esses controles, um Secret do Kubernetes é, na prática, equivalente a um ConfigMap
-com uma etiqueta "sensível" — a codificação sozinha não impede ninguém com acesso de
-recuperar o dado original.
+![Pods, Secret, ConfigMap e conexão](evidencias/nivel-3-secret-configmap.png)

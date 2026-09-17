@@ -59,6 +59,15 @@ def test_api_is_reachable(api_url):
     assert resp.status_code == 200
 
 
+def test_anon_role_cannot_delete(api_url):
+    """O papel anônimo tem apenas SELECT/INSERT: DELETE deve ser recusado pelo banco."""
+    resp = requests.delete(f"{api_url}/todos", params={"id": "eq.1"}, timeout=10)
+    assert resp.status_code in (401, 403), (
+        f"DELETE deveria ser negado para o papel anônimo, veio {resp.status_code}"
+    )
+    assert "permission denied" in resp.text.lower()
+
+
 def test_data_survives_postgres_pod_deletion(api_url):
     # 1. Insere um dado via POST
     payload = {"title": "pytest-persistence-check"}
