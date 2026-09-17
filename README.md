@@ -291,6 +291,10 @@ Histórico completo e navegável em [Pull Requests](https://github.com/MeloJu/k8
 <table align="center">
   <tr>
     <td align="center">
+      <img src="https://avatars.githubusercontent.com/u/87333686?v=4" alt="Juan Melo" width="120" height="120" style="border-radius: 50%;">
+      <br>
+      <strong>Juan Melo</strong>
+      <br>
       <a href="https://github.com/MeloJu" target="_blank">
         <img src="https://img.shields.io/badge/GitHub-100000?style=for-the-badge&logo=github&logoColor=white" alt="GitHub">
       </a>
