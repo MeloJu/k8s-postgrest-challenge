@@ -1,113 +1,84 @@
-# Decisões de hardening além do desafio
+# Segurança e reprodutibilidade
 
-Este documento registra melhorias aplicadas a todos os manifests depois que os 7 níveis
-do desafio já estavam funcionando, pensando no repositório como um projeto real, não só
-como entrega de exercício. Nenhuma delas era exigida pelos critérios de aceitação — são
-práticas de produção que valem a pena independente disso.
+Decisões que valem para todos os manifests, verificadas pelo Checkov no
+[pipeline de CI](ci-cd.md).
 
-## 1. Imagens fixadas por versão/digest
+## Imagens fixadas por digest
 
-**Antes**: `postgres:16` e `postgrest/postgrest:latest`.
+`postgres` e `postgrest` são referenciados por `sha256`, não por tag:
 
-**Depois**: `postgres:16.15` (versão exata) e
-`postgrest/postgrest@sha256:ec0e25a4e24b0a3bc5e4f011369bfc736bd1b19f513bd01079b86329a7636962`
-(digest exato, resolvido a partir da tag `:latest` em 2026-09-17 — na época,
-correspondia à versão PostgREST 16.3).
+```yaml
+image: postgres@sha256:f1c3376c26f2609ab9f29f71f824103fe2fcd8ee0346485cb6122a4f93df6f94
+```
 
-Uma tag flutuante como `:latest` ou `:16` pode apontar para uma imagem diferente amanhã,
-sem que nenhum YAML mude — o mesmo `kubectl apply` pode se comportar diferente em
-momentos diferentes. Fixar por digest é a forma mais rigorosa de garantir que o que roda
-em qualquer ambiente é **exatamente** a mesma imagem, byte a byte.
+Uma tag é um ponteiro móvel: `:latest` — e mesmo `:16` — pode apontar para outra imagem
+amanhã sem que nenhum arquivo mude, e o mesmo `kubectl apply` produz resultados diferentes
+em momentos diferentes. Um digest identifica o conteúdo, não o rótulo: a imagem é
+byte-a-byte a mesma em qualquer ambiente e em qualquer data. Atualização passa a ser um
+commit explícito e revisável.
 
-## 2. Labels padrão do Kubernetes
+## Contexto de segurança dos containers
 
-Todos os recursos (antes só o Namespace tinha) ganharam o conjunto recomendado pela
-[documentação oficial](https://kubernetes.io/docs/concepts/overview/working-with-objects/common-labels/):
-`app.kubernetes.io/name`, `/instance`, `/part-of`, `/managed-by`. Isso não muda
-comportamento nenhum — é metadado — mas é o que ferramentas de terceiros (Lens, ArgoCD,
-dashboards) usam pra agrupar e exibir recursos relacionados de forma legível.
+Ambos os Deployments aplicam:
 
-Importante: o label usado nos `selector.matchLabels` (`app: postgres` / `app: postgrest`)
-**não foi alterado** — esse campo é imutável depois que o Deployment existe, e trocá-lo
-exigiria recriar o recurso do zero. Os labels novos foram só **adicionados** ao lado dele.
+```yaml
+securityContext:          # Pod
+  runAsNonRoot: true
+  runAsUser: <uid>
+  fsGroup: <gid>
+securityContext:          # container
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: true
+  capabilities:
+    drop: ["ALL"]
+  seccompProfile:
+    type: RuntimeDefault
+```
 
-## 3. `strategy.type: Recreate` no Deployment do Postgres
+- **Não-root**: o Postgres roda como uid 999 (o usuário `postgres` da imagem), o PostgREST
+  como uid 1000 (o padrão da imagem). Um processo comprometido não começa com privilégio
+  administrativo dentro do container.
+- **Filesystem raiz somente leitura**: os caminhos que precisam de escrita são declarados
+  explicitamente — `PGDATA` no PVC, e `emptyDir` em `/tmp` e `/var/run/postgresql`.
+  Qualquer escrita fora desses pontos falha.
+- **Todas as capabilities removidas**: nenhum dos dois processos precisa de capability
+  Linux — as portas usadas estão acima de 1024 e não há manipulação de rede ou de
+  usuários em runtime. Rodar como uid fixo desde o início também elimina a necessidade de
+  `SETUID`/`SETGID` que o entrypoint da imagem usaria para trocar de usuário.
+- **`automountServiceAccountToken: false`**: nenhuma das aplicações fala com a API do
+  Kubernetes, então o token não é montado.
 
-Esta é a correção mais importante desta rodada, não só estética.
+## Credenciais como arquivo
 
-A estratégia padrão de rollout de um Deployment é `RollingUpdate`, que tenta subir o Pod
-novo **antes** de derrubar o antigo (pra não ter downtime). Isso funciona bem para
-aplicações sem estado como o PostgREST — mas o Postgres está com `replicas: 1` montando
-um PVC `ReadWriteOnce`, que só pode ser montado por um Pod por vez. Com `RollingUpdate`,
-o Pod novo ficaria preso em `Pending` esperando um volume que o Pod antigo ainda não
-liberou, e o rollout travaria.
+Nenhuma credencial chega aos containers por variável de ambiente. O Postgres lê a senha
+via `POSTGRES_PASSWORD_FILE`, e o PostgREST recebe a configuração inteira em
+`/etc/postgrest/postgrest.conf`, ambos montados a partir do Secret com modo `0440`.
+Detalhes em [configuração e credenciais](nivel-3-secret-configmap.md).
 
-Com `strategy.type: Recreate`, o Kubernetes garante que o Pod antigo é **totalmente
-terminado** (e libera o PVC) antes de criar o substituto. Isso significa um pequeno
-período de indisponibilidade a cada atualização do Postgres — um trade-off aceitável e
-correto para uma carga stateful de réplica única, muito melhor do que um rollout que
-trava silenciosamente.
+## Privilégio mínimo no banco
 
-## 4. `resources` e probes também no Postgres
+A API não se conecta como dono do banco. Existe um papel de conexão sem privilégios
+(`authenticator`) e um papel de execução com exatamente as permissões que a API precisa
+(`web_anon`: `SELECT` e `INSERT` em uma tabela). Detalhes e verificação automatizada em
+[API conectada ao banco](nivel-4-postgrest-integracao.md).
 
-O desafio pedia probes e limits explicitamente só "na API" (Nível 6). Estendi os dois
-para o Postgres também:
+## Estratégia de rollout do banco
 
-- `resources.requests`/`limits`: mesma lógica do Nível 6 — sem isso, o Postgres concorre
-  por CPU/memória sem nenhum teto, podendo afetar outros Pods do nó.
-- `livenessProbe`/`readinessProbe` via `pg_isready` (a ferramenta oficial do Postgres
-  pra checar se o servidor está aceitando conexões): mais preciso que só checar se o
-  processo existe — confirma que o banco está de fato pronto para receber queries.
+O Deployment do Postgres usa `strategy: Recreate`. O padrão (`RollingUpdate`) cria o Pod
+novo antes de remover o antigo, mas um PVC `ReadWriteOnce` só monta em um Pod por vez — o
+Pod novo ficaria em `Pending` esperando um volume que não é liberado, e o rollout travaria.
 
-## 5. Achados reais do Checkov (rodado pelo `ci.yml`)
+`Recreate` troca disponibilidade contínua por consistência: há uma janela curta de
+indisponibilidade a cada atualização, que é o comportamento correto para uma carga
+stateful de instância única. Eliminar essa janela exige replicação de verdade, não outra
+estratégia de rollout.
 
-Assim que o `ci.yml` rodou pela primeira vez, o Checkov encontrou 26 findings reais nos
-Deployments. Em vez de aplicar todos cegamente, tratei cada um pela relação
-risco/benefício:
+## Rótulos padrão
 
-**Corrigidos** (baixo risco, sem impacto funcional):
+Todos os recursos carregam o conjunto recomendado pela documentação do Kubernetes
+(`app.kubernetes.io/name`, `/instance`, `/part-of`, `/managed-by`), usado por ferramentas
+de observabilidade e GitOps para agrupar recursos relacionados.
 
-- `CKV_K8S_43` (imagem deveria usar digest) — o Postgres ainda estava só com a tag
-  `16.15`; fixei por digest também, como já tinha feito com o PostgREST.
-- `CKV_K8S_15` (Image Pull Policy deveria ser `Always`) — adicionado nos dois.
-- `CKV_K8S_38` (Service Account Token só deve ser montado onde necessário) —
-  `automountServiceAccountToken: false` nos dois Pods (nenhum dos dois fala com a API do
-  Kubernetes, então o token nunca é usado).
-- `CKV_K8S_31` (seccomp profile) — `RuntimeDefault` nos dois containers.
-- `CKV_K8S_20`, `CKV_K8S_28`, `CKV_K8S_37` (privilege escalation e capabilities Linux) —
-  `allowPrivilegeEscalation: false` e `capabilities.drop: ["ALL"]` **só no PostgREST**.
-  Testado ao vivo: rollout completou, e a API continuou respondendo normalmente.
-
-**Conscientemente não aplicados** (risco de quebrar algo que já funciona, validado):
-
-- `CKV_K8S_20`/`CKV_K8S_28`/`CKV_K8S_37` **no Postgres**: a imagem oficial do Postgres
-  usa `gosu` no entrypoint pra trocar de root para o usuário `postgres` — isso exige as
-  capabilities `SETUID`/`SETGID`. Remover todas as capabilities quebraria a
-  inicialização do container. Não vale o risco pra um ganho que é só metadado de scanner.
-- `CKV_K8S_23`/`CKV_K8S_29`/`CKV_K8S_30` (rodar como non-root / `securityContext`
-  completo): pelo mesmo motivo — o entrypoint do Postgres precisa iniciar como root pra
-  ajustar permissões do diretório de dados antes de fazer o drop de privilégio sozinho.
-  Forçar `runAsNonRoot: true` de fora quebraria esse processo.
-- `CKV_K8S_22` (filesystem somente leitura): tanto o Postgres (escreve WAL, dados, locks)
-  quanto o PostgREST (pode precisar de arquivos temporários) dependem de escrita fora do
-  volume montado explicitamente. Aplicar isso exigiria mapear `emptyDir`s adicionais para
-  cada caminho de escrita conhecido — não testei essa superfície inteira, e prefiro não
-  aplicar um controle de segurança sem validar que não quebra nada.
-- `CKV_K8S_35` (preferir Secrets montados como arquivo a variáveis de ambiente): o
-  Postgres oficial suporta isso nativamente via `POSTGRES_PASSWORD_FILE` — daria pra
-  migrar com baixo risco. O PostgREST, porém, não tem um equivalente documentado pra
-  `PGRST_DB_URI` vindo de arquivo; migrar exigiria um script de entrypoint customizado
-  lendo o arquivo e exportando a variável, o que é escopo maior do que cabe nesta rodada
-  de hardening. Registrado aqui como próximo passo possível, não como pendência ignorada.
-
-Nenhum desses itens não corrigidos é uma "falha" no sentido de quebrar o funcionamento —
-são trade-offs de segurança vs. estabilidade, e a decisão de não aplicá-los foi feita
-conscientemente, não por desconhecimento. Um scanner de segurança aponta possibilidades;
-cabe a quem mantém o sistema avaliar o custo real de cada uma.
-
-## Validação
-
-Todas as mudanças foram aplicadas e testadas no cluster já em funcionamento: o rollout
-do Postgres com `Recreate` completou sem ficar preso, os dados da tabela `todos`
-sobreviveram à recriação, e o PostgREST continuou respondendo normalmente após o
-deployment ser atualizado com a imagem fixada.
+Os rótulos de `selector` (`app: postgres` / `app: postgrest`) foram mantidos inalterados:
+`spec.selector` é imutável depois que o Deployment existe, e alterá-lo exigiria recriar o
+recurso.

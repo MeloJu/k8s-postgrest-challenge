@@ -1,7 +1,7 @@
 <h1 align="center">k8s-postgrest-challenge</h1>
 <p align="center">
-  API <a href="https://postgrest.org/">PostgREST</a> integrada a um PostgreSQL num cluster Kubernetes local —
-  persistência de dados provada de verdade, configuração externalizada, health checks, escala automática e CI/CD real.
+  API <a href="https://postgrest.org/">PostgREST</a> sobre PostgreSQL em Kubernetes —
+  armazenamento persistente, privilégio mínimo, health checks, escala automática e CI/CD.
 </p>
 
 <p align="center">
@@ -18,29 +18,12 @@
   <img src="https://img.shields.io/badge/Python-3776AB?style=for-the-badge&logo=python&logoColor=white" alt="Python">
 </p>
 
-Feito como parte do desafio "Fundamentos de Kubernetes na Prática" do CloudOps Bootcamp
-(S7 — Kubernetes), documentando cada nível progressivamente. Não é só a entrega final —
-é o histórico completo de como cada peça foi construída, testada e por quê, incluindo os
-erros reais encontrados no caminho (um deles, pelo próprio pipeline de CI/CD).
+Stack completa rodando em Kubernetes: banco relacional com armazenamento persistente,
+API REST conectada a ele por DNS interno, health checks, escala automática por CPU e
+pipeline de CI/CD que valida tudo em um cluster criado do zero a cada execução.
 
------
-
-## ✨ Destaques
-
-- **Persistência provada com o cluster de verdade**, não só descrita: o dado sobrevive à
-  deleção do Pod do banco, incluindo o comportamento real (e documentado) de reconexão do
-  pool de conexões do PostgREST.
-- **O CD achou um bug antes de qualquer avaliador ver**: a primeira execução num cluster
-  efêmero falhou porque uma tabela só existia por um passo manual, nunca por manifest —
-  corrigido e documentado como estudo de caso em [docs/ci-cd.md](docs/ci-cd.md).
-- **Hardening guiado por dado real, não por achismo**: o Checkov encontrou 26 findings;
-  11 foram corrigidos, e os 15 restantes foram conscientemente mantidos com justificativa
-  técnica registrada — ver [docs/hardening-producao.md](docs/hardening-producao.md).
-- **Evidências 100% fiéis**: nenhuma captura de terminal tem comando fabricado — o que
-  aparece ecoado é exatamente o que rodou, warts and all (inclusive um erro real de
-  conexão que virou evidência em vez de ser escondido).
-- **GitFlow de verdade**: `main` protegida, um PR por nível, histórico completo e
-  navegável em [Pull Requests](https://github.com/MeloJu/k8s-postgrest-challenge/pulls?q=is%3Apr+is%3Amerged).
+Cada decisão de arquitetura está documentada com o raciocínio por trás dela e a evidência
+do comportamento verificado.
 
 -----
 
@@ -57,8 +40,8 @@ graph LR
 
 A API nunca se conecta ao banco por IP — ela usa o **nome do Service** (`postgres`) como
 host na string de conexão, resolvido via DNS interno do cluster. Isso é o que permite o
-Pod do banco ser recriado (perdendo IP) sem que a API perca a conexão. Ver a reflexão do
-[Nível 4](docs/nivel-4-postgrest-integracao.md) para o detalhe completo.
+Pod do banco ser recriado (perdendo IP) sem que a API perca a conexão. Detalhes em
+[API conectada ao banco](docs/nivel-4-postgrest-integracao.md).
 
 -----
 
@@ -95,7 +78,7 @@ kind create cluster --name k8s-challenge
 | `kubeconform`, Checkov, Semgrep | últimas imagens | validação no `ci.yml` |
 
 Por que as versões estão fixadas por digest e não por tag: ver
-[docs/hardening-producao.md](docs/hardening-producao.md#1-imagens-fixadas-por-versãodigest).
+[segurança e reprodutibilidade](docs/hardening-producao.md#imagens-fixadas-por-digest).
 
 -----
 
@@ -109,10 +92,9 @@ kubectl apply -f k8s/
 kubectl get pods -n desafio-k8s -w         # espere tudo ficar Running/Ready
 ```
 
-Ver [`k8s/README.md`](k8s/README.md) para o que cada manifest faz e por que a numeração
-não é cronológica.
+Ver [`k8s/README.md`](k8s/README.md) para o papel de cada manifest e a ordem de aplicação.
 
-### Bônus: HPA (Nível 7)
+### HPA (opcional)
 
 O HorizontalPodAutoscaler depende do `metrics-server`, que não vem instalado por padrão
 no `kind`:
@@ -142,8 +124,16 @@ Em outro terminal:
 curl http://localhost:3000/todos
 ```
 
-Deve retornar `[]` (tabela vazia, criada automaticamente — ver [docs/ci-cd.md](docs/ci-cd.md))
-ou os registros já inseridos.
+Numa instalação nova, retorna os registros de exemplo criados junto com a tabela:
+
+```json
+[
+  {"id":1,"title":"Aplicar os manifests com kubectl apply -f k8s/","done":true},
+  {"id":2,"title":"Testar a persistencia deletando o Pod do Postgres","done":false}
+]
+```
+
+Uma resposta com dados reais aqui já confirma que a integração API↔banco está de pé.
 
 ### Inserir e ler um dado
 
@@ -156,7 +146,7 @@ curl -X POST http://localhost:3000/todos \
 curl http://localhost:3000/todos
 ```
 
-### Persistência (o coração do desafio)
+### Persistência
 
 ```bash
 kubectl delete pod -n desafio-k8s -l app=postgres
@@ -166,10 +156,10 @@ curl http://localhost:3000/todos   # o dado inserido antes ainda deve estar lá
 
 Se o `curl` logo após a recriação retornar um erro `57P01` (conexão encerrada), é
 esperado — o pool de conexões do PostgREST ainda apontava pro Pod antigo. Tente de novo;
-ele reconecta sozinho (ver [Nível 5](docs/nivel-5-persistencia.md) pra evidência real
-disso acontecendo).
+ele reconecta sozinho — comportamento documentado em
+[prova de persistência](docs/nivel-5-persistencia.md).
 
-### Escalonamento automático (bônus)
+### Escalonamento automático
 
 ```bash
 kubectl run load-generator -n desafio-k8s --image=busybox:stable --restart=Never -- \
@@ -197,43 +187,40 @@ kind delete cluster --name k8s-challenge   # se quiser remover o cluster inteiro
 
 -----
 
-## 📚 Documentação por nível
-
-Cada nível do desafio tem seu próprio documento com o que foi feito, os comandos usados,
-evidências e a resposta à pergunta de reflexão proposta:
-
-| Nível | Documento | Peso na avaliação |
-|---|---|---|
-| 1 — Namespace e primeiro contato | [docs/nivel-1-namespace-pod.md](docs/nivel-1-namespace-pod.md) | parte de "Organização" (10%) |
-| 2 — PostgreSQL com persistência | [docs/nivel-2-postgres-pvc.md](docs/nivel-2-postgres-pvc.md) | parte de "PVC e persistência" (30%) |
-| 3 — Secret e ConfigMap | [docs/nivel-3-secret-configmap.md](docs/nivel-3-secret-configmap.md) | "ConfigMap + Secret" (15%) |
-| 4 — API conectada ao banco | [docs/nivel-4-postgrest-integracao.md](docs/nivel-4-postgrest-integracao.md) | "Integração API↔banco" (25%) |
-| 5 — Expor a API e provar persistência | [docs/nivel-5-persistencia.md](docs/nivel-5-persistencia.md) | "PVC e persistência" (30%) |
-| 6 — Health checks e escala | [docs/nivel-6-probes-escala.md](docs/nivel-6-probes-escala.md) | "Health checks + limits" (10%) |
-| 7 — Escalonamento automático (bônus) | [docs/nivel-7-hpa.md](docs/nivel-7-hpa.md) | bônus, fora do peso oficial |
-
-Documentos que vão além dos 7 níveis:
+## 📚 Documentação
 
 | Documento | Conteúdo |
 |---|---|
-| [docs/hardening-producao.md](docs/hardening-producao.md) | Imagens fixadas por digest, labels padrão, `strategy: Recreate`, achados do Checkov (corrigidos e conscientemente aceitos) |
-| [docs/ci-cd.md](docs/ci-cd.md) | Design dos workflows + o bug real de reprodutibilidade que o `cd.yml` encontrou na primeira execução |
+| [Namespace e primeiro contato](docs/nivel-1-namespace-pod.md) | Isolamento por Namespace e por que workloads usam controladores |
+| [PostgreSQL com armazenamento persistente](docs/nivel-2-postgres-pvc.md) | PVC, estratégia de rollout e Service interno |
+| [Configuração e credenciais](docs/nivel-3-secret-configmap.md) | ConfigMap vs Secret, credenciais montadas como arquivo |
+| [API conectada ao banco](docs/nivel-4-postgrest-integracao.md) | Papéis de privilégio mínimo e conexão por DNS do Service |
+| [Exposição e prova de persistência](docs/nivel-5-persistencia.md) | Dado sobrevivendo à destruição do Pod do banco |
+| [Health checks, limites e escala](docs/nivel-6-probes-escala.md) | Liveness vs readiness, requests/limits, réplicas |
+| [Escalonamento automático](docs/nivel-7-hpa.md) | HPA por CPU, metrics-server e teste de carga |
+| [Segurança e reprodutibilidade](docs/hardening-producao.md) | Imagens por digest, containers não-root, filesystem somente leitura |
+| [CI/CD](docs/ci-cd.md) | Workflows, e o problema de reprodutibilidade que o pipeline encontrou |
 
 -----
 
-## 🔐 Segurança — decisões conscientes, não descuido
+## 🔐 Segurança
 
-Três trade-offs de segurança foram feitos de propósito neste projeto, e todos estão
-documentados com o raciocínio completo (não só "é assim"):
+- **Privilégio mínimo no banco**: a API conecta com um papel sem privilégios
+  (`authenticator`) que assume `web_anon` — `SELECT` e `INSERT` em uma única tabela.
+  `DELETE` é recusado pelo banco, e isso é verificado por
+  [teste automatizado](tests/test_persistence.py).
+- **Containers não-root**, com filesystem raiz somente leitura, todas as capabilities
+  Linux removidas e `seccompProfile: RuntimeDefault`.
+- **Credenciais entregues como arquivo**, nunca em variáveis de ambiente.
+- **Imagens fixadas por digest**, garantindo que o mesmo `kubectl apply` produza o mesmo
+  resultado em qualquer ambiente.
 
-1. **O Secret está commitado com uma senha real** ([Nível 3](docs/nivel-3-secret-configmap.md)) —
-   aceitável porque é uma credencial descartável de um banco local, e o próprio critério
-   de avaliação exige que o Secret seja visível no repositório.
-2. **`PGRST_DB_ANON_ROLE` reaproveita o dono da tabela** ([Nível 4](docs/nivel-4-postgrest-integracao.md)) —
-   numa API real, seria uma conta separada com só `SELECT`.
-3. **15 findings do Checkov não foram corrigidos** ([hardening](docs/hardening-producao.md)) —
-   principalmente porque removeriam capabilities Linux (`SETUID`/`SETGID`) que o
-   entrypoint oficial do Postgres precisa pra funcionar. Testado, não presumido.
+Detalhes e raciocínio em
+[segurança e reprodutibilidade](docs/hardening-producao.md).
+
+As credenciais versionadas são de demonstração: o banco é local, sem exposição externa, e
+o papel usado pela API é o de privilégio mínimo acima. Em um ambiente com dados reais,
+elas viriam do pipeline de deploy ou de um gestor externo de segredos.
 
 -----
 
@@ -243,10 +230,10 @@ documentados com o raciocínio completo (não só "é assim"):
 k8s-postgrest-challenge/
 ├── 📂 k8s/                  # manifests numerados (ver k8s/README.md)
 ├── 📂 docs/
-│   ├── 📄 nivel-N-*.md       # um documento por nível do desafio
-│   ├── 📄 hardening-producao.md
+│   ├── 📄 nivel-N-*.md       # uma etapa da construção por arquivo
+│   ├── 📄 hardening-producao.md  # segurança e reprodutibilidade
 │   ├── 📄 ci-cd.md
-│   └── 📂 evidencias/        # prints referenciados pelos docs acima (100% fiéis)
+│   └── 📂 evidencias/        # saídas de terminal reais referenciadas pelos docs
 ├── 📂 tests/                 # pytest: teste automatizado de persistência
 └── 📂 .github/workflows/     # ci.yml (soft-fail) e cd.yml (hard-fail)
 ```
@@ -265,7 +252,7 @@ Dois workflows do GitHub Actions, detalhados em [docs/ci-cd.md](docs/ci-cd.md):
 
 O `cd.yml`, rodando num cluster efêmero de verdade, pegou uma lacuna real de
 reprodutibilidade que só existia porque o cluster de desenvolvimento nunca tinha sido
-recriado do zero — ver [a história completa](docs/ci-cd.md#um-bug-real-que-o-cdyml-encontrou-na-primeira-execução).
+recriado do zero — ver [o caso completo](docs/ci-cd.md#caso-real-o-passo-que-só-existia-no-meu-terminal).
 
 -----
 
@@ -274,15 +261,9 @@ recriado do zero — ver [a história completa](docs/ci-cd.md#um-bug-real-que-o-
 `main` (protegida, só recebe PR de `develop`), `develop` (integração) e uma branch
 `feature/*`/`fix/*`/`chore/*` por entrega, cada uma com seu próprio PR:
 
-| # | O quê |
-|---|---|
-| 1-7 | Um PR por nível do desafio |
-| 8 | Hardening de produção (guiado pelo Checkov) |
-| 9 | README completo |
-| 11 | Pipeline de CI/CD |
-| 13 | Correção do bug de reprodutibilidade encontrado pelo CD |
-
-Histórico completo e navegável em [Pull Requests](https://github.com/MeloJu/k8s-postgrest-challenge/pulls?q=is%3Apr+is%3Amerged).
+Cada etapa — infraestrutura do banco, credenciais, API, escala, segurança, CI/CD — foi
+integrada por um PR próprio, com o raciocínio registrado na descrição. Histórico completo
+em [Pull Requests](https://github.com/MeloJu/k8s-postgrest-challenge/pulls?q=is%3Apr+is%3Amerged).
 
 -----
 
@@ -306,5 +287,5 @@ Histórico completo e navegável em [Pull Requests](https://github.com/MeloJu/k8
 </table>
 
 <p align="center">
-  <sub>CloudOps Bootcamp — S7 Kubernetes · Feito nível a nível, com os erros reais deixados à mostra.</sub>
+  <sub>Cada decisão documentada com o raciocínio e a evidência do comportamento verificado.</sub>
 </p>

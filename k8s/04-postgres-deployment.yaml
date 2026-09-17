@@ -11,6 +11,8 @@ metadata:
 spec:
   replicas: 1
   strategy:
+    # PVC ReadWriteOnce só monta em um Pod por vez: o Pod antigo precisa sair antes
+    # do novo entrar, senão o rollout trava em Pending.
     type: Recreate
   selector:
     matchLabels:
@@ -24,13 +26,21 @@ spec:
         app.kubernetes.io/part-of: k8s-postgrest-challenge
     spec:
       automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 999
+        runAsGroup: 999
+        fsGroup: 999
       containers:
         - name: postgres
-          # Tag 16.15 resolvida em 2026-09-17 e fixada por digest para build
-          # reprodutível (ver docs/hardening-producao.md).
+          # Tag 16.15 fixada por digest (build reprodutível).
           image: postgres@sha256:f1c3376c26f2609ab9f29f71f824103fe2fcd8ee0346485cb6122a4f93df6f94
           imagePullPolicy: Always
           securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
             seccompProfile:
               type: RuntimeDefault
           ports:
@@ -44,31 +54,20 @@ spec:
               memory: 256Mi
           livenessProbe:
             exec:
-              command:
-                - sh
-                - -c
-                - pg_isready -U $POSTGRES_USER -d $POSTGRES_DB
-            initialDelaySeconds: 10
+              command: ["pg_isready", "-U", "desafio_user", "-d", "desafio_db"]
+            initialDelaySeconds: 15
             periodSeconds: 10
           readinessProbe:
             exec:
-              command:
-                - sh
-                - -c
-                - pg_isready -U $POSTGRES_USER -d $POSTGRES_DB
+              command: ["pg_isready", "-U", "desafio_user", "-d", "desafio_db"]
             initialDelaySeconds: 5
             periodSeconds: 5
           env:
             - name: POSTGRES_USER
               valueFrom:
-                secretKeyRef:
-                  name: postgres-secret
+                configMapKeyRef:
+                  name: postgres-config
                   key: POSTGRES_USER
-            - name: POSTGRES_PASSWORD
-              valueFrom:
-                secretKeyRef:
-                  name: postgres-secret
-                  key: POSTGRES_PASSWORD
             - name: POSTGRES_DB
               valueFrom:
                 configMapKeyRef:
@@ -79,20 +78,46 @@ spec:
                 configMapKeyRef:
                   name: postgres-config
                   key: PGDATA
+            # Credencial lida de arquivo, não de variável de ambiente.
+            - name: POSTGRES_PASSWORD_FILE
+              value: /run/secrets/postgres/postgres-password
           volumeMounts:
             - name: postgres-storage
               mountPath: /var/lib/postgresql/data
-            - name: postgres-init-sql
-              mountPath: /docker-entrypoint-initdb.d/init.sql
-              subPath: init.sql
+            - name: postgres-secret
+              mountPath: /run/secrets/postgres
               readOnly: true
+            - name: postgres-init
+              mountPath: /docker-entrypoint-initdb.d/init.sh
+              subPath: init.sh
+              readOnly: true
+            # readOnlyRootFilesystem exige volumes graváveis explícitos para os
+            # caminhos que o Postgres usa fora do PGDATA.
+            - name: run-postgresql
+              mountPath: /var/run/postgresql
+            - name: tmp
+              mountPath: /tmp
       volumes:
         - name: postgres-storage
           persistentVolumeClaim:
             claimName: postgres-pvc
-        - name: postgres-init-sql
+        - name: postgres-secret
+          secret:
+            secretName: postgres-secret
+            defaultMode: 0440
+            items:
+              - key: postgres-password
+                path: postgres-password
+              - key: authenticator-password
+                path: authenticator-password
+        - name: postgres-init
           configMap:
             name: postgres-config
+            defaultMode: 0555
             items:
-              - key: init.sql
-                path: init.sql
+              - key: init.sh
+                path: init.sh
+        - name: run-postgresql
+          emptyDir: {}
+        - name: tmp
+          emptyDir: {}

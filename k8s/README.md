@@ -1,41 +1,41 @@
 # Manifests
 
-Arquivos numerados na ordem em que devem ser aplicados — `kubectl apply -f k8s/` funciona
-porque o `kubectl` processa os arquivos em ordem alfabética/numérica dentro da pasta.
+Arquivos numerados na ordem de aplicação — `kubectl apply -f k8s/` funciona porque o
+`kubectl` processa os arquivos em ordem alfabética dentro da pasta.
 
-A numeração segue a ordem lógica de dependência (config antes de quem consome, banco
-antes da API), **não** a ordem cronológica em que foram criados durante o desafio — por
-isso `01`/`02` (Secret/ConfigMap) só passaram a existir depois do PVC (`03`), quando o
-[Nível 3](../docs/nivel-3-secret-configmap.md) migrou as credenciais que já estavam
-hardcoded no Deployment desde o [Nível 2](../docs/nivel-2-postgres-pvc.md).
+A numeração segue a dependência lógica: configuração antes de quem a consome, banco antes
+da API.
 
-| Arquivo | Recurso | Nível |
+| Arquivo | Recurso | Documentação |
 |---|---|---|
-| `00-namespace.yaml` | Namespace `desafio-k8s` | [1](../docs/nivel-1-namespace-pod.md) |
-| `01-postgres-secret.yaml` | Secret com credenciais do Postgres | [3](../docs/nivel-3-secret-configmap.md) |
-| `02-postgres-configmap.yaml` | ConfigMap com config não sensível | [3](../docs/nivel-3-secret-configmap.md) |
-| `03-postgres-pvc.yaml` | PersistentVolumeClaim do Postgres | [2](../docs/nivel-2-postgres-pvc.md) |
-| `04-postgres-deployment.yaml` | Deployment do PostgreSQL | [2](../docs/nivel-2-postgres-pvc.md) |
-| `05-postgres-service.yaml` | Service (ClusterIP) do Postgres | [2](../docs/nivel-2-postgres-pvc.md) |
-| `06-postgrest-deployment.yaml` | Deployment do PostgREST | [4](../docs/nivel-4-postgrest-integracao.md) / [6](../docs/nivel-6-probes-escala.md) |
-| `07-postgrest-service.yaml` | Service (ClusterIP) da API | [5](../docs/nivel-5-persistencia.md) |
-| `08-postgrest-hpa.yaml` | HorizontalPodAutoscaler da API | [7](../docs/nivel-7-hpa.md) (bônus) |
+| `00-namespace.yaml` | Namespace `desafio-k8s` | [Namespace](../docs/nivel-1-namespace-pod.md) |
+| `01-postgres-secret.yaml` | Secret: senhas e configuração do PostgREST | [Credenciais](../docs/nivel-3-secret-configmap.md) |
+| `02-postgres-configmap.yaml` | ConfigMap: configuração e script de inicialização | [Credenciais](../docs/nivel-3-secret-configmap.md) |
+| `03-postgres-pvc.yaml` | PersistentVolumeClaim do banco | [Armazenamento](../docs/nivel-2-postgres-pvc.md) |
+| `04-postgres-deployment.yaml` | Deployment do PostgreSQL | [Armazenamento](../docs/nivel-2-postgres-pvc.md) |
+| `05-postgres-service.yaml` | Service ClusterIP do banco | [Armazenamento](../docs/nivel-2-postgres-pvc.md) |
+| `06-postgrest-deployment.yaml` | Deployment do PostgREST | [API](../docs/nivel-4-postgrest-integracao.md) |
+| `07-postgrest-service.yaml` | Service ClusterIP da API | [Exposição](../docs/nivel-5-persistencia.md) |
+| `08-postgrest-hpa.yaml` | HorizontalPodAutoscaler da API | [Escala automática](../docs/nivel-7-hpa.md) |
 
-Decisões que não pertencem a um nível específico (imagens fixadas, labels padrão,
-estratégia de rollout do Postgres) estão em [`docs/hardening-producao.md`](../docs/hardening-producao.md).
+Decisões transversais (imagens por digest, contexto de segurança dos containers,
+estratégia de rollout) estão em
+[`docs/hardening-producao.md`](../docs/hardening-producao.md).
 
-## Aplicar tudo
+## Aplicar
 
 ```bash
 kubectl apply -f k8s/
 ```
 
-## Derrubar tudo
+Um volume novo é inicializado pelo script `init.sh` do ConfigMap, que cria a tabela, os
+papéis de acesso e os registros de exemplo. Nenhum passo manual é necessário.
+
+## Remover
 
 ```bash
 kubectl delete namespace desafio-k8s
 ```
 
-Deletar o Namespace remove todos os recursos dentro dele de uma vez, incluindo o
-`HorizontalPodAutoscaler`. A única coisa que fica de fora é o `metrics-server`, que vive
-em `kube-system` (ver [Nível 7](../docs/nivel-7-hpa.md) para instalá-lo de novo).
+Remove todos os recursos do namespace, incluindo o HPA. O `metrics-server` vive em
+`kube-system` e não é afetado — ver [escala automática](../docs/nivel-7-hpa.md).
