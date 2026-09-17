@@ -11,9 +11,12 @@ ConfigMap, em vez de deixá-las escritas diretamente no Deployment.
 
 ```yaml
 stringData:
-  POSTGRES_USER: desafio_user
-  POSTGRES_PASSWORD: desafio_pass
+  POSTGRES_USER: <definido no arquivo aplicado>
+  POSTGRES_PASSWORD: <definido no arquivo aplicado>
 ```
+
+Os valores reais ficam só em [`k8s/01-postgres-secret.yaml`](../k8s/01-postgres-secret.yaml) —
+não repetidos aqui, pra não duplicar a credencial em texto solto pela documentação.
 
 Usei `stringData` (não `data`): o valor fica em texto plano no arquivo, e é o próprio
 `kubectl apply` quem faz a codificação base64 ao enviar pro cluster. Se fosse `data`, cada
@@ -104,8 +107,9 @@ real?**
 exige uma chave para reverter o processo; codificação é só uma troca de representação,
 reversível por qualquer um, sem chave nenhuma.
 
-A prova está na própria evidência acima: o valor `ZGVzYWZpb19wYXNz` volta a ser
-`desafio_pass` com um único comando, `base64 -d`, sem nenhuma senha ou chave adicional.
+A prova está na própria evidência acima: o valor codificado do Secret volta a ser a senha
+original com um único comando, `base64 -d`, sem nenhuma chave adicional (os valores em si
+não são repetidos aqui em texto — só na imagem, que já é a evidência do comando real).
 Qualquer pessoa com permissão de leitura sobre o objeto Secret (ou acesso direto ao etcd,
 onde o cluster armazena esses dados) recupera a credencial original instantaneamente.
 

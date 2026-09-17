@@ -32,8 +32,10 @@ extra foi necessário.
 ### 2. String de conexão no Secret ([`k8s/01-postgres-secret.yaml`](../k8s/01-postgres-secret.yaml))
 
 ```yaml
-DATABASE_URL: postgres://desafio_user:desafio_pass@postgres:5432/desafio_db
+DATABASE_URL: postgres://<usuario>:<senha>@postgres:5432/desafio_db
 ```
+
+(valores reais só em [`k8s/01-postgres-secret.yaml`](../k8s/01-postgres-secret.yaml))
 
 **Esta é a peça central do nível**: o host da string de conexão é `postgres` — o nome do
 Service criado no Nível 2, não um IP. Isso reaproveita o usuário/senha que já estavam no
