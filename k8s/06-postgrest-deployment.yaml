@@ -3,6 +3,8 @@ kind: Deployment
 metadata:
   name: postgrest
   namespace: desafio-k8s
+  annotations:
+    checkov.io/skip1: CKV_K8S_40=uid 1000 é o usuário não-root definido pela própria imagem do PostgREST (Config.User), mantido para não divergir do upstream
   labels:
     app.kubernetes.io/name: postgrest
     app.kubernetes.io/instance: postgrest
@@ -23,8 +25,6 @@ spec:
     spec:
       automountServiceAccountToken: false
       securityContext:
-        # checkov:skip=CKV_K8S_40: 1000 é o usuário não-root que a própria imagem do
-        # PostgREST define (Config.User), mantido para não divergir do upstream.
         runAsNonRoot: true
         runAsUser: 1000
         runAsGroup: 1000
