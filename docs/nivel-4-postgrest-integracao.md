@@ -18,9 +18,16 @@ CREATE TABLE IF NOT EXISTS todos (
 );
 ```
 
-Criada via `kubectl exec` no Pod do Postgres. `desafio_user` já é dono do banco
-`desafio_db` (o Postgres oficial torna o `POSTGRES_USER` do bootstrap automaticamente
-dono do `POSTGRES_DB`), então nenhum `GRANT` extra foi necessário.
+Criada originalmente via `kubectl exec` no Pod do Postgres, como exploração manual deste
+nível. `desafio_user` já é dono do banco `desafio_db` (o Postgres oficial torna o
+`POSTGRES_USER` do bootstrap automaticamente dono do `POSTGRES_DB`), então nenhum `GRANT`
+extra foi necessário.
+
+> **Atualização**: esse passo manual escondia uma lacuna real de reprodutibilidade — um
+> cluster novo, sem esse `kubectl exec`, nunca teria a tabela. Foi o próprio `cd.yml`
+> quem pegou isso rodando num cluster efêmero pela primeira vez. A criação da tabela
+> agora é automática via `/docker-entrypoint-initdb.d/`; detalhes em
+> [docs/ci-cd.md](ci-cd.md).
 
 ### 2. String de conexão no Secret ([`k8s/01-postgres-secret.yaml`](../k8s/01-postgres-secret.yaml))
 

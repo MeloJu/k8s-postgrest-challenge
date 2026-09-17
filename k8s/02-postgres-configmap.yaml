@@ -11,3 +11,13 @@ metadata:
 data:
   POSTGRES_DB: desafio_db
   PGDATA: /var/lib/postgresql/data/pgdata
+  # Executado automaticamente pela imagem oficial do postgres na PRIMEIRA
+  # inicialização do volume (mecanismo /docker-entrypoint-initdb.d/). Garante que
+  # `kubectl apply -f k8s/` sozinho já deixa a tabela pronta, sem passo manual de
+  # `psql` — foi assim que o cd.yml pegou essa lacuna num cluster efêmero do zero.
+  init.sql: |
+    CREATE TABLE IF NOT EXISTS todos (
+      id serial PRIMARY KEY,
+      title text NOT NULL,
+      done boolean NOT NULL DEFAULT false
+    );
