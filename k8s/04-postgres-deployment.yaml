@@ -23,9 +23,16 @@ spec:
         app.kubernetes.io/instance: postgres
         app.kubernetes.io/part-of: k8s-postgrest-challenge
     spec:
+      automountServiceAccountToken: false
       containers:
         - name: postgres
-          image: postgres:16.15
+          # Tag 16.15 resolvida em 2026-09-17 e fixada por digest para build
+          # reprodutível (ver docs/hardening-producao.md).
+          image: postgres@sha256:f1c3376c26f2609ab9f29f71f824103fe2fcd8ee0346485cb6122a4f93df6f94
+          imagePullPolicy: Always
+          securityContext:
+            seccompProfile:
+              type: RuntimeDefault
           ports:
             - containerPort: 5432
           resources:
