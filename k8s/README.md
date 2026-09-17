@@ -17,6 +17,7 @@ da API.
 | `06-postgrest-deployment.yaml` | Deployment do PostgREST | [API](../docs/nivel-4-postgrest-integracao.md) |
 | `07-postgrest-service.yaml` | Service ClusterIP da API | [Exposição](../docs/nivel-5-persistencia.md) |
 | `08-postgrest-hpa.yaml` | HorizontalPodAutoscaler da API | [Escala automática](../docs/nivel-7-hpa.md) |
+| `09-network-policies.yaml` | NetworkPolicies: default deny + liberações mínimas | [Segurança](../docs/hardening-producao.md#segmentação-de-rede) |
 
 Decisões transversais (imagens por digest, contexto de segurança dos containers,
 estratégia de rollout) estão em

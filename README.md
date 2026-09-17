@@ -214,6 +214,8 @@ kind delete cluster --name k8s-challenge   # se quiser remover o cluster inteiro
 - **Containers não-root**, com filesystem raiz somente leitura, todas as capabilities
   Linux removidas e `seccompProfile: RuntimeDefault`.
 - **Credenciais entregues como arquivo**, nunca em variáveis de ambiente.
+- **Segmentação de rede**: default deny de ingresso no namespace; o banco aceita conexões
+  apenas dos Pods da API.
 - **Imagens fixadas por digest**, garantindo que o mesmo `kubectl apply` produza o mesmo
   resultado em qualquer ambiente.
 

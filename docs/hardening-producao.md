@@ -62,6 +62,20 @@ A API não se conecta como dono do banco. Existe um papel de conexão sem privil
 (`web_anon`: `SELECT` e `INSERT` em uma tabela). Detalhes e verificação automatizada em
 [API conectada ao banco](nivel-4-postgrest-integracao.md).
 
+## Segmentação de rede
+
+[`k8s/09-network-policies.yaml`](../k8s/09-network-policies.yaml) parte de um
+*default deny* de ingresso no namespace e libera apenas dois caminhos: a API aceita HTTP
+na porta 3000, e o banco aceita conexões **apenas** dos Pods da API, apenas na 5432.
+
+Sem isso, qualquer Pod do namespace alcança o banco diretamente — a segmentação limita o
+alcance de um container comprometido ao que ele legitimamente precisa.
+
+A aplicação efetiva depende do CNI: o `kindnet`, padrão do `kind`, não implementa
+NetworkPolicy, então em cluster local as regras são declarativas. Em CNIs que as suportam
+(Calico, Cilium, e os CNIs gerenciados de EKS/GKE/AKS) passam a valer sem nenhuma
+alteração nos manifests.
+
 ## Estratégia de rollout do banco
 
 O Deployment do Postgres usa `strategy: Recreate`. O padrão (`RollingUpdate`) cria o Pod

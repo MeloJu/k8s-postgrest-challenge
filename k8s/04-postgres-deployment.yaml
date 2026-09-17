@@ -27,6 +27,9 @@ spec:
     spec:
       automountServiceAccountToken: false
       securityContext:
+        # checkov:skip=CKV_K8S_40: 999 é o usuário `postgres` da imagem oficial, já
+        # presente em /etc/passwd. O initdb resolve o uid efetivo via getpwuid() e
+        # falha com um uid arbitrário que não exista no container.
         runAsNonRoot: true
         runAsUser: 999
         runAsGroup: 999
