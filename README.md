@@ -136,6 +136,8 @@ evidências e a resposta à pergunta de reflexão proposta:
 
 Decisões que vão além do que o desafio pediu (imagens fixadas por digest, labels padrão,
 estratégia de rollout) estão em [docs/hardening-producao.md](docs/hardening-producao.md).
+O pipeline de CI/CD, incluindo um bug real de reprodutibilidade que ele mesmo encontrou,
+está documentado em [docs/ci-cd.md](docs/ci-cd.md).
 
 ## Evidências
 
@@ -152,22 +154,24 @@ docs/
   nivel-N-*.md         # um documento por nível do desafio
   hardening-producao.md
   evidencias/          # prints referenciados pelos docs acima
-tests/                 # testes automatizados (pytest) — em construção, ver CI/CD abaixo
-.github/workflows/     # CI/CD — em construção
+tests/                 # pytest: teste automatizado de persistência
+.github/workflows/     # ci.yml (soft-fail) e cd.yml (hard-fail)
 ```
 
-## CI/CD (em construção)
+## CI/CD
 
-O plano é ter dois workflows do GitHub Actions:
+Dois workflows do GitHub Actions, detalhados em [docs/ci-cd.md](docs/ci-cd.md):
 
-- **`ci.yml`**: em PRs para `develop`/`main` — valida sintaxe dos manifests
-  (kubeconform/kubeval), roda Checkov em `k8s/` e Semgrep em `tests/`. Soft-fail (reporta,
-  não bloqueia).
+- **`ci.yml`**: em PRs para `develop`/`main` — kubeconform, Checkov (`k8s/`) e Semgrep
+  (`tests/`). Soft-fail (reporta, não bloqueia).
 - **`cd.yml`**: em push para `main` — sobe um cluster `kind` efêmero, aplica os
-  manifests, espera tudo ficar `Ready`, e roda `pytest` (incluindo o teste automatizado
-  de persistência). Hard-fail.
+  manifests, espera tudo ficar `Ready`, roda `pytest` (incluindo o teste automatizado de
+  persistência). Hard-fail.
 
-Este README será atualizado quando esses workflows estiverem prontos.
+O `cd.yml`, rodando num cluster efêmero de verdade, pegou uma lacuna real de
+reprodutibilidade que só existia porque o cluster de desenvolvimento nunca tinha sido
+recriado do zero — ver [docs/ci-cd.md](docs/ci-cd.md#um-bug-real-que-o-cdyml-encontrou-na-primeira-execução)
+pra a história completa.
 
 ## GitFlow
 
