@@ -16,7 +16,7 @@ jobs:
       - name: Rodar kubeconform
         continue-on-error: true
         run: |
-          docker run --rm -v "$PWD/k8s:/k8s" ghcr.io/yannh/kubeconform:latest \
+          docker run --rm -v "$PWD/k8s:/k8s" ghcr.io/yannh/kubeconform:v0.8.0 \
             -summary -strict -kubernetes-version 1.36.0 /k8s
 
   checkov:
@@ -43,5 +43,5 @@ jobs:
       - name: Rodar Semgrep
         continue-on-error: true
         run: |
-          pip install semgrep
+          pip install semgrep==1.177.0
           semgrep scan --config auto tests/ --error || true

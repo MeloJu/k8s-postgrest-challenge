@@ -2,60 +2,53 @@
 
 ## `ci.yml` — validação em Pull Requests
 
-Roda em todo PR para `develop` ou `main`. Três jobs independentes, todos **soft-fail**
-(reportam, não bloqueiam o merge — o objetivo aqui é visibilidade, não gate):
+Roda em PRs para `develop` e `main`. Três jobs independentes:
 
-- **kubeconform**: valida a sintaxe e o schema de cada manifest em `k8s/` contra a versão
-  do Kubernetes usada no projeto.
-- **Checkov**: escaneia `k8s/` em busca de configurações de segurança arriscadas. Os
-  achados reais dessa ferramenta guiaram boa parte de
-  [`docs/hardening-producao.md`](hardening-producao.md).
-- **Semgrep**: escaneia `tests/` (regras genéricas de qualidade/segurança em Python).
+- **kubeconform** — valida sintaxe e schema de cada manifest contra a versão do Kubernetes
+  usada no projeto.
+- **Checkov** — análise estática de segurança sobre `k8s/`. Os achados dessa ferramenta
+  guiaram as decisões em [segurança e reprodutibilidade](hardening-producao.md).
+- **Semgrep** — análise estática sobre `tests/`.
+
+Os três são soft-fail: reportam sem bloquear o merge. A função aqui é visibilidade
+contínua; o gate real de correção é o `cd.yml`.
 
 ## `cd.yml` — deploy e teste em push para `main`
 
-Roda em todo push pra `main` (ou seja, todo merge de PR, já que a branch é protegida).
-**Hard-fail** — se falhar, o job falha de verdade:
+Hard-fail, em cluster efêmero criado do zero a cada execução:
 
-1. Sobe um cluster `kind` efêmero (`helm/kind-action`) — do zero, sem nenhum estado
-   anterior.
+1. Cria um cluster `kind` (`helm/kind-action`).
 2. `kubectl apply -f k8s/`.
-3. Espera todos os Pods do namespace ficarem `Ready`.
-4. Roda `pytest tests/`, incluindo o teste automatizado de persistência.
-5. Em caso de falha, despeja os logs do Postgres e do PostgREST pra facilitar o debug.
+3. Aguarda todos os Pods ficarem `Ready`.
+4. Roda `pytest tests/` — alcance da API, restrição de privilégio do papel anônimo e
+   persistência do dado após destruição do Pod do banco.
+5. Em caso de falha, despeja estado do cluster e logs dos dois componentes.
 
-## Um bug real que o `cd.yml` encontrou na primeira execução
+Cluster novo a cada execução é proposital: um ambiente de longa duração acumula estado
+aplicado manualmente e mascara passos que faltam na automação.
 
-Na primeira vez que o pipeline rodou de ponta a ponta, o passo "esperar Pods ficarem
-Ready" **falhou** — os dois Pods do PostgREST nunca saíam de `0/1`. O motivo, visível no
-`kubectl describe pod` capturado pelo próprio job de debug:
+## Caso real: o passo que só existia no meu terminal
+
+Na primeira execução completa, o `cd.yml` falhou ao aguardar os Pods:
 
 ```
 Warning  Unhealthy  Readiness probe failed: HTTP probe failed with statuscode: 404
 ```
 
-A causa: a tabela `todos` nunca foi criada por nenhum manifest. Durante o Nível 4, ela
-foi criada manualmente com `kubectl exec ... psql -c "CREATE TABLE ..."` — um passo que
-existia só na minha cabeça (e no terminal), nunca no repositório. O cluster de
-desenvolvimento, rodando continuamente desde então, escondia esse problema: a tabela
-sempre esteve lá porque nunca recriei o volume do zero. O cluster efêmero do `cd.yml`,
-por definição, não tem esse histórico — e expôs exatamente a lacuna que testes manuais
-não pegam: **o que só existe na minha máquina não é reproduzível**.
+A tabela `todos` não existia. Ela tinha sido criada manualmente com
+`kubectl exec ... psql -c "CREATE TABLE ..."` durante o desenvolvimento e nunca virou
+manifest. O cluster local, rodando há dias sem recriar o volume, sempre a teve — e por
+isso o problema era invisível localmente.
 
-### Correção
+A correção foi mover a criação do schema para `/docker-entrypoint-initdb.d/`, mecanismo
+nativo da imagem do Postgres que executa scripts na primeira inicialização de um volume
+vazio. Hoje o mesmo script também cria os papéis de acesso e alguns registros de exemplo,
+em [`k8s/02-postgres-configmap.yaml`](../k8s/02-postgres-configmap.yaml), montado pelo
+[Deployment do banco](../k8s/04-postgres-deployment.yaml).
 
-Movida a criação da tabela pro mecanismo nativo da imagem oficial do Postgres —
-qualquer script `.sql` colocado em `/docker-entrypoint-initdb.d/` roda automaticamente na
-**primeira inicialização** de um volume vazio. Implementado em
-[`k8s/02-postgres-configmap.yaml`](../k8s/02-postgres-configmap.yaml) (chave `init.sql`)
-montado como arquivo em
-[`k8s/04-postgres-deployment.yaml`](../k8s/04-postgres-deployment.yaml) via
-`volumeMounts` + `subPath`.
+Validação: `kubectl delete namespace` seguido de `kubectl apply -f k8s/` deixa o ambiente
+inteiro funcional, sem intervenção manual.
 
-Validado apagando o Namespace inteiro (forçando um volume genuinamente novo, replicando
-o cenário do cluster efêmero) e reaplicando `kubectl apply -f k8s/` do zero: todos os
-Pods ficaram `Ready` sozinhos, sem nenhum passo manual.
-
-Essa é exatamente a razão de ter um `cd.yml` com cluster efêmero em vez de só testar
-manualmente num cluster que já existe há dias — o ambiente de longa duração acumula
-estado que mascara passos esquecidos na automação.
+Os registros de exemplo existem por usabilidade — quem instala vê a API respondendo com
+dados reais no primeiro `GET`, sem precisar montar um `POST` antes. Eles não interferem no
+teste de persistência, que insere e rastreia um registro próprio.

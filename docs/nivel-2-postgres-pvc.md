@@ -1,86 +1,57 @@
-# Nível 2 — Banco de dados com persistência
+# 2 — PostgreSQL com armazenamento persistente
 
-## Objetivo
+## PersistentVolumeClaim
 
-Implantar o PostgreSQL com armazenamento que sobrevive à recriação do Pod, e um Service
-para que outros recursos consigam encontrá-lo pelo nome.
-
-## O que foi feito
-
-### 1. PersistentVolumeClaim ([`k8s/03-postgres-pvc.yaml`](../k8s/03-postgres-pvc.yaml))
-
-Um PVC é um pedido de armazenamento: você declara quanto espaço quer (`256Mi`) e como
-quer acessá-lo (`ReadWriteOnce` — um único nó por vez, padrão pra disco de bloco). O
-`storageClassName` foi deixado de fora de propósito: o `kind` já registra uma
-StorageClass `standard` marcada como padrão (via `rancher.io/local-path`), então o PVC
-usa essa automaticamente.
+[`k8s/03-postgres-pvc.yaml`](../k8s/03-postgres-pvc.yaml) reserva 256Mi em modo
+`ReadWriteOnce` (um nó por vez, padrão para disco de bloco). O `storageClassName` é
+omitido de propósito: o `kind` registra uma StorageClass `standard` como padrão
+(`rancher.io/local-path`), e omitir o campo faz o PVC usar a padrão do cluster — o mesmo
+manifest funciona em clusters com provisionadores diferentes.
 
 ```bash
-kubectl apply -f k8s/03-postgres-pvc.yaml
-kubectl get pvc -n desafio-k8s
+kubectl get pvc -n desafio-k8s   # STATUS precisa ser Bound, não Pending
 ```
 
-`STATUS` precisa ficar `Bound` (não `Pending`) — significa que o PVC foi vinculado a um
-volume real.
+## Deployment
 
-### 2. Deployment do Postgres ([`k8s/04-postgres-deployment.yaml`](../k8s/04-postgres-deployment.yaml))
+[`k8s/04-postgres-deployment.yaml`](../k8s/04-postgres-deployment.yaml), pontos de
+decisão:
 
-- `replicas: 1` é proposital — um PVC `ReadWriteOnce` só pode ser montado por um Pod de
-  cada vez, então esse Deployment nunca deve ser escalado (volta no Nível 6).
-- `env.PGDATA=/var/lib/postgresql/data/pgdata`: aponta o Postgres pra uma subpasta dentro
-  do volume montado. É a prática recomendada pela própria imagem oficial — evita erro de
-  inicialização caso o diretório raiz do volume não esteja 100% vazio.
-- `volumes` (nível Pod) declara **o quê** montar (o PVC `postgres-pvc`);
-  `volumeMounts` (nível container) diz **onde** montar (`/var/lib/postgresql/data`).
-- **Credenciais hardcoded (`POSTGRES_USER`/`POSTGRES_PASSWORD`) direto no YAML — de
-  propósito.** É a prática ruim que o Nível 3 vai corrigir movendo pra um Secret.
+- **`replicas: 1`** — um PVC `ReadWriteOnce` só pode ser montado por um Pod por vez.
+  Escalar este Deployment não é uma opção; detalhes em [nível 6](nivel-6-probes-escala.md).
+- **`strategy: Recreate`** — a estratégia padrão (`RollingUpdate`) tentaria subir o Pod
+  novo antes de derrubar o antigo, e o novo ficaria preso em `Pending` esperando o volume
+  ser liberado. Ver [hardening](hardening-producao.md).
+- **`PGDATA=/var/lib/postgresql/data/pgdata`** — aponta o Postgres para uma subpasta do
+  volume montado, prática recomendada pela imagem oficial: se o diretório raiz do volume
+  não estiver vazio (alguns provisionadores deixam `lost+found`), o `initdb` se recusa a
+  rodar.
+- **`volumes` vs `volumeMounts`** — `volumes` (nível Pod) declara *o quê* montar;
+  `volumeMounts` (nível container) declara *onde*.
+
+## Service
+
+[`k8s/05-postgres-service.yaml`](../k8s/05-postgres-service.yaml) é `ClusterIP` (padrão):
+alcançável apenas de dentro do cluster, que é o correto para um banco — só a API precisa
+chegar nele. O nome do Service (`postgres`) é o endereço DNS usado pela API no
+[nível 4](nivel-4-postgrest-integracao.md).
+
+## Verificação
 
 ```bash
-kubectl apply -f k8s/04-postgres-deployment.yaml
-kubectl get pods -n desafio-k8s -w
+kubectl apply -f k8s/03-postgres-pvc.yaml -f k8s/04-postgres-deployment.yaml -f k8s/05-postgres-service.yaml
+kubectl exec deployment/postgres -n desafio-k8s -- psql -U desafio_user -d desafio_db -c "SELECT version();"
 ```
-
-### 3. Service ([`k8s/05-postgres-service.yaml`](../k8s/05-postgres-service.yaml))
-
-`ClusterIP` (o padrão, sem precisar declarar `type`) — só acessível de dentro do
-cluster, que é exatamente o que se quer: só a API (Nível 4) precisa falar com o banco,
-nunca alguém de fora. O nome do Service (`postgres`) é o que vira endereço DNS interno
-usado no Nível 4.
-
-```bash
-kubectl apply -f k8s/05-postgres-service.yaml
-kubectl get svc -n desafio-k8s
-```
-
-### 4. Conferência
-
-```bash
-kubectl exec -it deployment/postgres -n desafio-k8s -- psql -U desafio_user -d desafio_db -c "SELECT version();"
-```
-
-`kubectl exec` roda um comando dentro do container já existente (equivalente ao
-`docker exec`). Apontar pra `deployment/postgres` em vez do nome exato do Pod evita
-precisar descobrir o sufixo aleatório gerado pelo ReplicaSet.
-
-## Evidências
 
 ![PVC, Deployment, Service e conferência via psql](evidencias/nivel-2-postgres-pvc.png)
 
-## Reflexão
+## PVC vs emptyDir
 
-**Qual a diferença entre montar um PVC e um `emptyDir`? O que aconteceria com os dados
-em cada caso ao deletar o Pod?**
+Um `emptyDir` tem ciclo de vida atrelado ao Pod: some junto com ele, em qualquer cenário
+de remoção (deleção manual, recriação pelo Deployment, realocação de nó). Serve para cache
+ou troca de arquivos entre containers do mesmo Pod.
 
-Um `emptyDir` é um volume criado junto com o Pod, vivendo no mesmo nó — seu ciclo de
-vida está **atrelado ao Pod**: quando o Pod é removido (por qualquer motivo: deleção
-manual, recriação pelo Deployment, realocação de nó), o `emptyDir` e tudo que estava
-nele desaparece junto. Ele serve pra dados descartáveis ou cache compartilhado entre
-containers do mesmo Pod, nunca pra dados que precisam sobreviver.
-
-Um PVC tem ciclo de vida **independente do Pod**. Ele existe como um objeto próprio no
-cluster, vinculado a um volume real (aqui, um diretório gerenciado pelo
-`local-path-provisioner` do kind). Quando o Pod que o usa é deletado e o Deployment cria
-um Pod substituto, o novo Pod monta o **mesmo** PVC — e portanto o **mesmo** volume com
-os mesmos dados. É essa independência que torna possível a prova de persistência do
-Nível 5: o dado sobrevive porque ele nunca esteve "dentro" do Pod, estava num volume que
-o Pod apenas monta temporariamente.
+Um PVC é um objeto independente do Pod, vinculado a um volume real. Quando o Deployment
+cria um Pod substituto, esse Pod monta o **mesmo** PVC — e portanto os mesmos dados. É
+essa independência que sustenta a prova de persistência do
+[nível 5](nivel-5-persistencia.md): o dado sobrevive porque nunca esteve dentro do Pod.
