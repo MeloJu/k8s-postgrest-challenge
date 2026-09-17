@@ -4,7 +4,7 @@ metadata:
   name: postgrest
   namespace: desafio-k8s
 spec:
-  replicas: 1
+  replicas: 2
   selector:
     matchLabels:
       app: postgrest
@@ -18,6 +18,25 @@ spec:
           image: postgrest/postgrest:latest
           ports:
             - containerPort: 3000
+          resources:
+            requests:
+              cpu: 100m
+              memory: 64Mi
+            limits:
+              cpu: 250m
+              memory: 128Mi
+          livenessProbe:
+            httpGet:
+              path: /
+              port: 3000
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /todos
+              port: 3000
+            initialDelaySeconds: 5
+            periodSeconds: 5
           env:
             - name: PGRST_DB_URI
               valueFrom:
