@@ -60,6 +60,17 @@ kubectl get pod -n desafio-k8s
 # No resources found in desafio-k8s namespace.
 ```
 
+## Evidências
+
+Namespace criado e rotulado:
+
+![Namespace desafio-k8s](evidencias/nivel-1-namespace.png)
+
+Ciclo de vida completo do Pod avulso — criado, rodando, deletado, e a confirmação de que
+não voltou:
+
+![Ciclo de vida do Pod avulso](evidencias/nivel-1-pod-lifecycle.png)
+
 ## Reflexão
 
 **Ao deletar esse Pod avulso, ele volta sozinho? Por quê?**
