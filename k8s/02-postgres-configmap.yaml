@@ -1,0 +1,13 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: postgres-config
+  namespace: desafio-k8s
+  labels:
+    app.kubernetes.io/name: postgres
+    app.kubernetes.io/instance: postgres
+    app.kubernetes.io/part-of: k8s-postgrest-challenge
+    app.kubernetes.io/managed-by: kubectl
+data:
+  POSTGRES_DB: desafio_db
+  PGDATA: /var/lib/postgresql/data/pgdata

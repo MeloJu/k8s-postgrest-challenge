@@ -1,0 +1,16 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: postgres-pvc
+  namespace: desafio-k8s
+  labels:
+    app.kubernetes.io/name: postgres
+    app.kubernetes.io/instance: postgres
+    app.kubernetes.io/part-of: k8s-postgrest-challenge
+    app.kubernetes.io/managed-by: kubectl
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 256Mi
