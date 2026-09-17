@@ -59,6 +59,52 @@ para o Postgres também:
   pra checar se o servidor está aceitando conexões): mais preciso que só checar se o
   processo existe — confirma que o banco está de fato pronto para receber queries.
 
+## 5. Achados reais do Checkov (rodado pelo `ci.yml`)
+
+Assim que o `ci.yml` rodou pela primeira vez, o Checkov encontrou 26 findings reais nos
+Deployments. Em vez de aplicar todos cegamente, tratei cada um pela relação
+risco/benefício:
+
+**Corrigidos** (baixo risco, sem impacto funcional):
+
+- `CKV_K8S_43` (imagem deveria usar digest) — o Postgres ainda estava só com a tag
+  `16.15`; fixei por digest também, como já tinha feito com o PostgREST.
+- `CKV_K8S_15` (Image Pull Policy deveria ser `Always`) — adicionado nos dois.
+- `CKV_K8S_38` (Service Account Token só deve ser montado onde necessário) —
+  `automountServiceAccountToken: false` nos dois Pods (nenhum dos dois fala com a API do
+  Kubernetes, então o token nunca é usado).
+- `CKV_K8S_31` (seccomp profile) — `RuntimeDefault` nos dois containers.
+- `CKV_K8S_20`, `CKV_K8S_28`, `CKV_K8S_37` (privilege escalation e capabilities Linux) —
+  `allowPrivilegeEscalation: false` e `capabilities.drop: ["ALL"]` **só no PostgREST**.
+  Testado ao vivo: rollout completou, e a API continuou respondendo normalmente.
+
+**Conscientemente não aplicados** (risco de quebrar algo que já funciona, validado):
+
+- `CKV_K8S_20`/`CKV_K8S_28`/`CKV_K8S_37` **no Postgres**: a imagem oficial do Postgres
+  usa `gosu` no entrypoint pra trocar de root para o usuário `postgres` — isso exige as
+  capabilities `SETUID`/`SETGID`. Remover todas as capabilities quebraria a
+  inicialização do container. Não vale o risco pra um ganho que é só metadado de scanner.
+- `CKV_K8S_23`/`CKV_K8S_29`/`CKV_K8S_30` (rodar como non-root / `securityContext`
+  completo): pelo mesmo motivo — o entrypoint do Postgres precisa iniciar como root pra
+  ajustar permissões do diretório de dados antes de fazer o drop de privilégio sozinho.
+  Forçar `runAsNonRoot: true` de fora quebraria esse processo.
+- `CKV_K8S_22` (filesystem somente leitura): tanto o Postgres (escreve WAL, dados, locks)
+  quanto o PostgREST (pode precisar de arquivos temporários) dependem de escrita fora do
+  volume montado explicitamente. Aplicar isso exigiria mapear `emptyDir`s adicionais para
+  cada caminho de escrita conhecido — não testei essa superfície inteira, e prefiro não
+  aplicar um controle de segurança sem validar que não quebra nada.
+- `CKV_K8S_35` (preferir Secrets montados como arquivo a variáveis de ambiente): o
+  Postgres oficial suporta isso nativamente via `POSTGRES_PASSWORD_FILE` — daria pra
+  migrar com baixo risco. O PostgREST, porém, não tem um equivalente documentado pra
+  `PGRST_DB_URI` vindo de arquivo; migrar exigiria um script de entrypoint customizado
+  lendo o arquivo e exportando a variável, o que é escopo maior do que cabe nesta rodada
+  de hardening. Registrado aqui como próximo passo possível, não como pendência ignorada.
+
+Nenhum desses itens não corrigidos é uma "falha" no sentido de quebrar o funcionamento —
+são trade-offs de segurança vs. estabilidade, e a decisão de não aplicá-los foi feita
+conscientemente, não por desconhecimento. Um scanner de segurança aponta possibilidades;
+cabe a quem mantém o sistema avaliar o custo real de cada uma.
+
 ## Validação
 
 Todas as mudanças foram aplicadas e testadas no cluster já em funcionamento: o rollout
