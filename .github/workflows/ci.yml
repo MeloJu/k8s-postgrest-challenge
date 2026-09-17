@@ -1,0 +1,47 @@
+name: CI
+
+on:
+  pull_request:
+    branches:
+      - develop
+      - main
+
+jobs:
+  validate-manifests:
+    name: Validar sintaxe dos manifests (kubeconform)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Rodar kubeconform
+        continue-on-error: true
+        run: |
+          docker run --rm -v "$PWD/k8s:/k8s" ghcr.io/yannh/kubeconform:latest \
+            -summary -strict -kubernetes-version 1.36.0 /k8s
+
+  checkov:
+    name: Checkov (k8s/)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Rodar Checkov
+        uses: bridgecrewio/checkov-action@v12
+        continue-on-error: true
+        with:
+          directory: k8s/
+          framework: kubernetes
+          soft_fail: true
+          quiet: false
+
+  semgrep:
+    name: Semgrep (tests/)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Rodar Semgrep
+        continue-on-error: true
+        run: |
+          pip install semgrep
+          semgrep scan --config auto tests/ --error || true
