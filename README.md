@@ -69,13 +69,15 @@ kind create cluster --name k8s-challenge
 |---|---|---|
 | `kind` | v0.32.0 | cluster Kubernetes local |
 | `kubectl` / nó do cluster | v1.36.1 | orquestração |
-| `postgres` | 16.15 (fixado por digest) | banco de dados |
-| `postgrest/postgrest` | resolvido de `:latest` para 16.3, fixado por digest | API REST |
-| `metrics-server` | último release | métricas de CPU pro HPA |
-| Python (CI) | 3.12 | ambiente do pytest |
-| `pytest` | 8.3.3 | teste automatizado de persistência |
-| `requests` | 2.32.3 | cliente HTTP do teste |
-| `kubeconform`, Checkov, Semgrep | últimas imagens | validação no `ci.yml` |
+| `postgres` | 16.15 (`sha256:f1c3376c…`) | banco de dados |
+| `postgrest/postgrest` | 16.3 (`sha256:ec0e25a4…`) | API REST |
+| `metrics-server` | v0.9.0 | métricas de CPU para o HPA |
+| Python | 3.12 | ambiente do pytest |
+| `pytest` | 8.3.3 | testes automatizados |
+| `requests` | 2.32.3 | cliente HTTP dos testes |
+| `kubeconform` | v0.8.0 | validação de schema dos manifests |
+| Checkov | 3.3.19 | análise estática de segurança |
+| Semgrep | 1.177.0 | análise estática do código de teste |
 
 Por que as versões estão fixadas por digest e não por tag: ver
 [segurança e reprodutibilidade](docs/hardening-producao.md#imagens-fixadas-por-digest).
@@ -100,7 +102,7 @@ O HorizontalPodAutoscaler depende do `metrics-server`, que não vem instalado po
 no `kind`:
 
 ```bash
-kubectl apply -f https://github.com/kubernetes-sigs/metrics-server/releases/latest/download/components.yaml
+kubectl apply -f https://github.com/kubernetes-sigs/metrics-server/releases/download/v0.9.0/components.yaml
 kubectl patch deployment metrics-server -n kube-system --type=json \
   -p '[{"op": "add", "path": "/spec/template/spec/containers/0/args/-", "value": "--kubelet-insecure-tls"}]'
 ```
