@@ -1,0 +1,51 @@
+name: CD
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  deploy-and-test:
+    name: Deploy num cluster efêmero e rodar testes
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Criar cluster kind
+        uses: helm/kind-action@v1
+        with:
+          cluster_name: k8s-challenge-ci
+
+      - name: Aplicar manifests
+        run: kubectl apply -f k8s/
+
+      - name: Esperar todos os Pods ficarem Ready
+        run: |
+          kubectl wait --for=condition=Ready pods --all \
+            -n desafio-k8s --timeout=180s
+
+      - name: Estado do cluster (debug)
+        if: always()
+        run: |
+          kubectl get all -n desafio-k8s
+          kubectl describe pods -n desafio-k8s
+
+      - name: Configurar Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Instalar dependências dos testes
+        run: pip install -r tests/requirements.txt
+
+      - name: Rodar pytest (inclui teste de persistência)
+        run: pytest tests/ -v
+
+      - name: Logs em caso de falha
+        if: failure()
+        run: |
+          echo "--- postgres ---"
+          kubectl logs -n desafio-k8s -l app=postgres --tail=100
+          echo "--- postgrest ---"
+          kubectl logs -n desafio-k8s -l app=postgrest --tail=100

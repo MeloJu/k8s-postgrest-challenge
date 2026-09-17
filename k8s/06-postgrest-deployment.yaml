@@ -21,11 +21,19 @@ spec:
         app.kubernetes.io/instance: postgrest
         app.kubernetes.io/part-of: k8s-postgrest-challenge
     spec:
+      automountServiceAccountToken: false
       containers:
         - name: postgrest
           # Tag :latest resolvida em 2026-09-17 para PostgREST 16.3 e fixada por
-          # digest, para build reprodutível (ver docs/nivel-4-postgrest-integracao.md).
+          # digest, para build reprodutível (ver docs/hardening-producao.md).
           image: postgrest/postgrest@sha256:ec0e25a4e24b0a3bc5e4f011369bfc736bd1b19f513bd01079b86329a7636962
+          imagePullPolicy: Always
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
+            seccompProfile:
+              type: RuntimeDefault
           ports:
             - containerPort: 3000
           resources:
