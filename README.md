@@ -203,6 +203,21 @@ kind delete cluster --name k8s-challenge   # se quiser remover o cluster inteiro
 | [Segurança e reprodutibilidade](docs/hardening-producao.md) | Imagens por digest, containers não-root, filesystem somente leitura |
 | [CI/CD](docs/ci-cd.md) | Workflows, e o problema de reprodutibilidade que o pipeline encontrou |
 
+### Reflexões conceituais
+
+As perguntas conceituais de cada etapa estão respondidas nos próprios documentos, como
+seções técnicas:
+
+| Pergunta | Onde está respondida |
+|---|---|
+| Um Pod avulso deletado volta sozinho? Por quê? | [Por que isso importa](docs/nivel-1-namespace-pod.md#por-que-isso-importa) |
+| Qual a diferença entre montar um PVC e um `emptyDir`? | [PVC vs emptyDir](docs/nivel-2-postgres-pvc.md#pvc-vs-emptydir) |
+| O valor "embaralhado" do Secret é criptografia ou codificação? | [Base64 não é criptografia](docs/nivel-3-secret-configmap.md#base64-não-é-criptografia) |
+| Por que usar o nome do Service em vez do IP do Pod? | [Conexão pelo Service, não por IP](docs/nivel-4-postgrest-integracao.md#conexão-pelo-service-não-por-ip) |
+| Quantos componentes precisaram funcionar juntos para o dado sobreviver? | [O que precisou funcionar junto](docs/nivel-5-persistencia.md#o-que-precisou-funcionar-junto) |
+| Qual a diferença prática entre liveness e readiness? | [Probes](docs/nivel-6-probes-escala.md#probes) |
+| Por que escalar a API é seguro e escalar o banco com o mesmo PVC não é? | [Por que o banco não escala do mesmo jeito](docs/nivel-6-probes-escala.md#por-que-o-banco-não-escala-do-mesmo-jeito) |
+
 -----
 
 ## 🔐 Segurança
