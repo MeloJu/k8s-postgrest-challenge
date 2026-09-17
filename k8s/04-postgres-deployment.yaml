@@ -3,8 +3,15 @@ kind: Deployment
 metadata:
   name: postgres
   namespace: desafio-k8s
+  labels:
+    app.kubernetes.io/name: postgres
+    app.kubernetes.io/instance: postgres
+    app.kubernetes.io/part-of: k8s-postgrest-challenge
+    app.kubernetes.io/managed-by: kubectl
 spec:
   replicas: 1
+  strategy:
+    type: Recreate
   selector:
     matchLabels:
       app: postgres
@@ -12,12 +19,38 @@ spec:
     metadata:
       labels:
         app: postgres
+        app.kubernetes.io/name: postgres
+        app.kubernetes.io/instance: postgres
+        app.kubernetes.io/part-of: k8s-postgrest-challenge
     spec:
       containers:
         - name: postgres
-          image: postgres:16
+          image: postgres:16.15
           ports:
             - containerPort: 5432
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 500m
+              memory: 256Mi
+          livenessProbe:
+            exec:
+              command:
+                - sh
+                - -c
+                - pg_isready -U $POSTGRES_USER -d $POSTGRES_DB
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          readinessProbe:
+            exec:
+              command:
+                - sh
+                - -c
+                - pg_isready -U $POSTGRES_USER -d $POSTGRES_DB
+            initialDelaySeconds: 5
+            periodSeconds: 5
           env:
             - name: POSTGRES_USER
               valueFrom:

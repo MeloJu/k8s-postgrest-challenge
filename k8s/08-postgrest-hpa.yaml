@@ -3,6 +3,11 @@ kind: HorizontalPodAutoscaler
 metadata:
   name: postgrest
   namespace: desafio-k8s
+  labels:
+    app.kubernetes.io/name: postgrest
+    app.kubernetes.io/instance: postgrest
+    app.kubernetes.io/part-of: k8s-postgrest-challenge
+    app.kubernetes.io/managed-by: kubectl
 spec:
   scaleTargetRef:
     apiVersion: apps/v1
