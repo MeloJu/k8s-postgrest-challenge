@@ -176,7 +176,7 @@ final, remove a carga e mostra a redução de volta ao mínimo.
 Sem o script, os mesmos passos manualmente:
 
 ```bash
-kubectl run load-generator -n desafio-k8s --image=busybox:stable --restart=Never -- \
+kubectl run load-generator -n desafio-k8s --image=busybox:1.37.0 --restart=Never -- \
   /bin/sh -c "for i in 1 2 3 4; do (while true; do wget -q -O- http://postgrest:3000/todos > /dev/null; done) & done; wait"
 
 kubectl get hpa -n desafio-k8s -w      # réplicas sobem conforme a CPU passa de 50%
