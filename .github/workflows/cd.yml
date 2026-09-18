@@ -17,6 +17,9 @@ jobs:
         with:
           cluster_name: k8s-challenge-ci
 
+      - name: Instalar metrics-server (plataforma)
+        run: ./scripts/install-metrics-server.sh
+
       - name: Aplicar manifests
         run: kubectl apply -f k8s/
 
