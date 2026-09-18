@@ -11,7 +11,7 @@ Decisões que valem para todos os manifests, verificadas pelo Checkov no
 image: postgres@sha256:f1c3376c26f2609ab9f29f71f824103fe2fcd8ee0346485cb6122a4f93df6f94
 ```
 
-Uma tag é um ponteiro móvel: `:latest` — e mesmo `:16` — pode apontar para outra imagem
+Uma tag é um ponteiro móvel: `:latest` (e mesmo `:16`) pode apontar para outra imagem
 amanhã sem que nenhum arquivo mude, e o mesmo `kubectl apply` produz resultados diferentes
 em momentos diferentes. Um digest identifica o conteúdo, não o rótulo: a imagem é
 byte-a-byte a mesma em qualquer ambiente e em qualquer data. Atualização passa a ser um
@@ -39,10 +39,10 @@ securityContext:          # container
   como uid 1000 (o padrão da imagem). Um processo comprometido não começa com privilégio
   administrativo dentro do container.
 - **Filesystem raiz somente leitura**: os caminhos que precisam de escrita são declarados
-  explicitamente — `PGDATA` no PVC, e `emptyDir` em `/tmp` e `/var/run/postgresql`.
+  explicitamente: `PGDATA` no PVC, e `emptyDir` em `/tmp` e `/var/run/postgresql`.
   Qualquer escrita fora desses pontos falha.
 - **Todas as capabilities removidas**: nenhum dos dois processos precisa de capability
-  Linux — as portas usadas estão acima de 1024 e não há manipulação de rede ou de
+  Linux: as portas usadas estão acima de 1024 e não há manipulação de rede ou de
   usuários em runtime. Rodar como uid fixo desde o início também elimina a necessidade de
   `SETUID`/`SETGID` que o entrypoint da imagem usaria para trocar de usuário.
 - **`automountServiceAccountToken: false`**: nenhuma das aplicações fala com a API do
@@ -68,7 +68,7 @@ A API não se conecta como dono do banco. Existe um papel de conexão sem privil
 *default deny* de ingresso no namespace e libera apenas dois caminhos: a API aceita HTTP
 na porta 3000, e o banco aceita conexões **apenas** dos Pods da API, apenas na 5432.
 
-Sem isso, qualquer Pod do namespace alcança o banco diretamente — a segmentação limita o
+Sem isso, qualquer Pod do namespace alcança o banco diretamente; a segmentação limita o
 alcance de um container comprometido ao que ele legitimamente precisa.
 
 A aplicação efetiva depende do CNI: o `kindnet`, padrão do `kind`, não implementa
@@ -79,7 +79,7 @@ alteração nos manifests.
 ## Estratégia de rollout do banco
 
 O Deployment do Postgres usa `strategy: Recreate`. O padrão (`RollingUpdate`) cria o Pod
-novo antes de remover o antigo, mas um PVC `ReadWriteOnce` só monta em um Pod por vez — o
+novo antes de remover o antigo, mas um PVC `ReadWriteOnce` só monta em um Pod por vez, então o
 Pod novo ficaria em `Pending` esperando um volume que não é liberado, e o rollout travaria.
 
 `Recreate` troca disponibilidade contínua por consistência: há uma janela curta de

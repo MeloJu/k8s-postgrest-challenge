@@ -1,4 +1,4 @@
-# 5 — Exposição da API e prova de persistência
+# 5. Exposição da API e prova de persistência
 
 ## Exposição
 
@@ -37,7 +37,7 @@ curl http://localhost:3000/todos
 
 ![Deleção, recriação e confirmação do dado](evidencias/nivel-5-persistencia-depois.png)
 
-O Pod recriado tem sufixo diferente — é um Pod novo, e o dado continua lá.
+O Pod recriado tem sufixo diferente: é um Pod novo, e o dado continua lá.
 
 ## Reconexão do pool
 
@@ -47,7 +47,7 @@ PostgREST ainda mantinha uma conexão para o Pod destruído. Na tentativa seguin
 conexão morta é descartada e o pool reconecta pelo mesmo nome de Service, sem intervenção.
 
 O comportamento está registrado na evidência acima em vez de omitido, e o
-[teste automatizado](../tests/test_persistence.py) trata isso explicitamente com retry —
+[teste automatizado](../tests/test_persistence.py) trata isso explicitamente com retry:
 um cliente de produção precisaria da mesma tolerância.
 
 ## O que precisou funcionar junto
@@ -65,6 +65,6 @@ pedaço do estado:
 | Service do PostgREST | manter o ponto de acesso do cliente inalterado |
 
 Nenhum deles conhece os outros. O Deployment do banco não sabe que existe uma API
-dependendo dele — apenas mantém o número de réplicas correto. A auto-recuperação emerge da
+dependendo dele; apenas mantém o número de réplicas correto. A auto-recuperação emerge da
 composição de loops de reconciliação simples e independentes, não de um componente central
 que orquestra tudo.
