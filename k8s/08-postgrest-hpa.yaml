@@ -3,6 +3,13 @@ kind: HorizontalPodAutoscaler
 metadata:
   name: postgrest
   namespace: desafio-k8s
+  annotations:
+    # Visível em `kubectl describe hpa postgrest -n desafio-k8s`, que é onde se olha
+    # ao encontrar TARGETS em <unknown>.
+    dependencia: >-
+      Requer metrics-server no cluster para ler CPU. Sem ele o HPA fica em <unknown> e
+      não escala. Instalação em scripts/install-metrics-server.sh ou nos dois comandos
+      do README (secção "Camada de plataforma").
   labels:
     app.kubernetes.io/name: postgrest
     app.kubernetes.io/instance: postgrest
