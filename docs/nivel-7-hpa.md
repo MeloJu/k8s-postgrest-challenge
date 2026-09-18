@@ -47,12 +47,18 @@ essa diferença é deliberada e local.
 ## Geração de carga
 
 ```bash
-kubectl run load-generator -n desafio-k8s --image=busybox:stable --restart=Never -- \
+kubectl run load-generator -n desafio-k8s --image=busybox:1.37.0 --restart=Never -- \
   /bin/sh -c "for i in 1 2 3 4; do (while true; do wget -q -O- http://postgrest:3000/todos > /dev/null; done) & done; wait"
 ```
 
 O gerador roda dentro do cluster e acessa o Service pelo nome, sem depender de
 `port-forward` (que roda na máquina host e não sustenta carga contínua de forma confiável).
+
+A imagem é fixada em `1.37.0` e não em `stable`, pela mesma razão das imagens da
+aplicação: tags que acompanham um fluxo (`stable`, `latest`, `16`) mudam de conteúdo sem
+aviso. Aqui uma tag de release já basta, em vez do digest usado nos Deployments, porque
+este Pod é descartável e não faz parte do que é entregue; o que importa é o comando não
+passar a se comportar diferente amanhã.
 
 ## Resultado
 
