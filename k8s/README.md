@@ -1,10 +1,13 @@
 # Manifests
 
-Arquivos numerados na ordem de aplicação — `kubectl apply -f k8s/` funciona porque o
-`kubectl` processa os arquivos em ordem alfabética dentro da pasta.
+> **A numeração destes arquivos é ordem de aplicação, não ordem dos níveis do desafio.**
+> `01-postgres-secret.yaml` vem antes de `04-postgres-deployment.yaml` porque o Deployment
+> consome o Secret — não porque um seja de um nível anterior. A coluna "Documentação" na
+> tabela abaixo liga cada manifest ao documento correspondente.
 
-A numeração segue a dependência lógica: configuração antes de quem a consome, banco antes
-da API.
+`kubectl apply -f k8s/` funciona porque o `kubectl` processa os arquivos em ordem
+alfabética dentro da pasta, e a numeração segue a dependência lógica: configuração antes
+de quem a consome, banco antes da API.
 
 | Arquivo | Recurso | Documentação |
 |---|---|---|
