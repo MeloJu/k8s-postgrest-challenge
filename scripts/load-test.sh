@@ -30,7 +30,7 @@ kubectl delete pod load-generator -n "$NAMESPACE" --ignore-not-found >/dev/null 
 
 echo
 echo "==> Subindo o gerador de carga (${WORKERS} processos por ${DURATION}s)"
-kubectl run load-generator -n "$NAMESPACE" --image=busybox:stable --restart=Never -- \
+kubectl run load-generator -n "$NAMESPACE" --image=busybox:1.37.0 --restart=Never -- \
   /bin/sh -c "for i in \$(seq 1 ${WORKERS}); do (while true; do wget -q -O- http://postgrest:3000/todos > /dev/null; done) & done; wait"
 
 kubectl wait --for=condition=Ready pod/load-generator -n "$NAMESPACE" --timeout=60s
