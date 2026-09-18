@@ -2,7 +2,7 @@
 
 > **A numeração destes arquivos é ordem de aplicação, não ordem dos níveis do desafio.**
 > `01-postgres-secret.yaml` vem antes de `04-postgres-deployment.yaml` porque o Deployment
-> consome o Secret — não porque um seja de um nível anterior. A coluna "Documentação" na
+> consome o Secret, não porque um seja de um nível anterior. A coluna "Documentação" na
 > tabela abaixo liga cada manifest ao documento correspondente.
 
 `kubectl apply -f k8s/` funciona porque o `kubectl` processa os arquivos em ordem
@@ -20,7 +20,7 @@ de quem a consome, banco antes da API.
 | `06-postgrest-deployment.yaml` | 4, 6 | Deployment do PostgREST (probes, limites e réplicas no 6) | [API](../docs/nivel-4-postgrest-integracao.md) · [Escala](../docs/nivel-6-probes-escala.md) |
 | `07-postgrest-service.yaml` | 5 | Service ClusterIP da API | [Exposição](../docs/nivel-5-persistencia.md) |
 | `08-postgrest-hpa.yaml` | 7 | HorizontalPodAutoscaler da API | [Escala automática](../docs/nivel-7-hpa.md) |
-| `09-network-policies.yaml` | — | NetworkPolicies: default deny + liberações mínimas | [Segurança](../docs/hardening-producao.md#segmentação-de-rede) |
+| `09-network-policies.yaml` | n/a | NetworkPolicies: default deny + liberações mínimas | [Segurança](../docs/hardening-producao.md#segmentação-de-rede) |
 
 O nível 9 não existe: `09-network-policies.yaml` é uma decisão de segurança transversal,
 fora da sequência do enunciado.
@@ -45,4 +45,4 @@ kubectl delete namespace desafio-k8s
 ```
 
 Remove todos os recursos do namespace, incluindo o HPA. O `metrics-server` vive em
-`kube-system` e não é afetado — ver [escala automática](../docs/nivel-7-hpa.md).
+`kube-system` e não é afetado. Ver [escala automática](../docs/nivel-7-hpa.md).

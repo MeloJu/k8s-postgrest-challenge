@@ -1,4 +1,4 @@
-# 1 — Namespace e primeiro contato
+# 1. Namespace e primeiro contato
 
 ## Namespace
 
@@ -20,11 +20,11 @@ kubectl run test-pod --image=busybox:stable -n desafio-k8s \
 Inspecionado com `kubectl get`, `logs` e `describe`, três campos importam para o resto do
 projeto:
 
-- **IP do Pod** (`10.244.0.5` na execução) — efêmero, muda a cada recriação. É por isso
+- **IP do Pod** (`10.244.0.5` na execução): efêmero, muda a cada recriação. É por isso
   que a conexão da API com o banco usa o nome do Service, não IP ([nível 4](nivel-4-postgrest-integracao.md)).
-- **QoS Class: BestEffort** — consequência de não declarar `requests`/`limits`. Corrigido
+- **QoS Class: BestEffort**, consequência de não declarar `requests`/`limits`. Corrigido
   no [nível 6](nivel-6-probes-escala.md).
-- **Events** (`Scheduled → Pulling → Pulled → Created → Started`) — o rastro que o
+- **Events** (`Scheduled → Pulling → Pulled → Created → Started`): o rastro que o
   control plane deixa. Primeiro lugar a olhar em `Pending` ou `CrashLoopBackOff`.
 
 Ao deletar o Pod, ele **não volta**:
@@ -43,7 +43,7 @@ kubectl get pod -n desafio-k8s
 
 ## Por que isso importa
 
-Um Pod criado diretamente não tem controlador guardando um estado desejado — ele *é* o
+Um Pod criado diretamente não tem controlador guardando um estado desejado; ele *é* o
 estado. Quem recria Pods é um `ReplicaSet` (gerenciado por um `Deployment`), `StatefulSet`
 ou `DaemonSet`, rodando um loop de reconciliação que compara réplicas desejadas com
 réplicas existentes e repõe a diferença.

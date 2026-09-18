@@ -1,4 +1,4 @@
-# 3 — Configuração e credenciais
+# 3. Configuração e credenciais
 
 Separação entre o que é configuração (ConfigMap) e o que é credencial (Secret), e como
 cada um é entregue ao container.
@@ -24,12 +24,12 @@ arquivo de configuração do PostgREST (que contém a string de conexão).
 
 O Secret é montado em `/run/secrets/postgres` com modo `0440`, e o `fsGroup` do Pod dá
 acesso de leitura apenas ao usuário do container. Variáveis de ambiente vazam com mais
-facilidade — aparecem em `kubectl describe pod`, em dumps de processo (`/proc/<pid>/environ`)
+facilidade: aparecem em `kubectl describe pod`, em dumps de processo (`/proc/<pid>/environ`)
 e em logs de crash de muitas aplicações. Arquivo montado tem superfície menor e é o que a
 imagem oficial do Postgres suporta nativamente através dos sufixos `_FILE`.
 
 O mesmo vale para a API: a string de conexão do PostgREST vive em
-`/etc/postgrest/postgrest.conf`, montado a partir do Secret — nunca em `env`.
+`/etc/postgrest/postgrest.conf`, montado a partir do Secret, nunca em `env`.
 
 ## Base64 não é criptografia
 
@@ -43,7 +43,7 @@ kubectl get secret postgres-secret -n desafio-k8s -o yaml
 
 Qualquer um reverte isso com `base64 -d`, sem chave nenhuma. Codificação é mudança de
 representação; criptografia exige uma chave para desfazer. O Secret do Kubernetes não
-protege o valor — ele apenas o separa do manifest da aplicação e permite controlar o
+protege o valor; ele apenas o separa do manifest da aplicação e permite controlar o
 acesso por outros mecanismos:
 
 - **RBAC** restringindo quem faz `get`/`list` em Secrets no namespace.
@@ -54,7 +54,7 @@ acesso por outros mecanismos:
 ## Credenciais neste repositório
 
 As credenciais versionadas aqui são de demonstração e existem para que
-`kubectl apply -f k8s/` funcione em qualquer clone sem passo manual — prática comum em
+`kubectl apply -f k8s/` funcione em qualquer clone sem passo manual, prática comum em
 repositórios de referência. Elas não dão acesso a nenhum recurso real: o banco é local,
 sem exposição externa, e o papel usado pela API tem privilégio mínimo
 ([nível 4](nivel-4-postgrest-integracao.md)).

@@ -1,4 +1,4 @@
-# 7 — Escalonamento automático
+# 7. Escalonamento automático
 
 ## metrics-server
 
@@ -37,7 +37,7 @@ behavior:
 ```
 
 `averageUtilization: 50` é relativo ao `requests.cpu` de 100m definido no
-[nível 6](nivel-6-probes-escala.md) — o HPA mira em ~50m médios por Pod.
+[nível 6](nivel-6-probes-escala.md): o HPA mira em ~50m médios por Pod.
 
 A janela de estabilização de scale-down é de 30s; o padrão do Kubernetes é 300s, pensado
 para evitar oscilação em resposta a picos curtos. O valor reduzido aqui torna o

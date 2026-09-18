@@ -1,6 +1,6 @@
 <h1 align="center">k8s-postgrest-challenge</h1>
 <p align="center">
-  API <a href="https://postgrest.org/">PostgREST</a> sobre PostgreSQL em Kubernetes —
+  API <a href="https://postgrest.org/">PostgREST</a> sobre PostgreSQL em Kubernetes:
   armazenamento persistente, privilégio mínimo, health checks, escala automática e CI/CD.
 </p>
 
@@ -36,7 +36,7 @@ graph LR
     DB --> PVC[("PVC: postgres-pvc")]
 ```
 
-A API nunca se conecta ao banco por IP — ela usa o **nome do Service** (`postgres`) como
+A API nunca se conecta ao banco por IP: ela usa o **nome do Service** (`postgres`) como
 host na string de conexão, resolvido via DNS interno do cluster. Isso é o que permite o
 Pod do banco ser recriado (perdendo IP) sem que a API perca a conexão. Detalhes em
 [API conectada ao banco](docs/nivel-4-postgrest-integracao.md).
@@ -98,7 +98,7 @@ Ver [`k8s/README.md`](k8s/README.md) para o papel de cada manifest e a ordem de 
 ### Camada de plataforma
 
 O `metrics-server` é dependência do HPA e **não** está em `k8s/`: é componente do cluster,
-não da aplicação — em clusters gerenciados (EKS, GKE, AKS) normalmente já vem instalado.
+não da aplicação, e em clusters gerenciados (EKS, GKE, AKS) normalmente já vem instalado.
 O procedimento fica em [`scripts/install-metrics-server.sh`](scripts/install-metrics-server.sh),
 usado tanto pelo setup local quanto pelo pipeline de CD.
 
@@ -147,8 +147,8 @@ curl http://localhost:3000/todos   # o dado inserido antes ainda deve estar lá
 ```
 
 Se o `curl` logo após a recriação retornar um erro `57P01` (conexão encerrada), é
-esperado — o pool de conexões do PostgREST ainda apontava pro Pod antigo. Tente de novo;
-ele reconecta sozinho — comportamento documentado em
+esperado: o pool de conexões do PostgREST ainda apontava pro Pod antigo. Tente de novo;
+ele reconecta sozinho, comportamento documentado em
 [prova de persistência](docs/nivel-5-persistencia.md).
 
 ### Escalonamento automático
@@ -206,7 +206,7 @@ seções técnicas:
 ## 🔐 Segurança
 
 - **Privilégio mínimo no banco**: a API conecta com um papel sem privilégios
-  (`authenticator`) que assume `web_anon` — `SELECT` e `INSERT` em uma única tabela.
+  (`authenticator`) que assume `web_anon`, com `SELECT` e `INSERT` em uma única tabela.
   `DELETE` é recusado pelo banco, e isso é verificado por
   [teste automatizado](tests/test_persistence.py).
 - **Containers não-root**, com filesystem raiz somente leitura, todas as capabilities
@@ -243,22 +243,22 @@ k8s-postgrest-challenge/
 
 Dois workflows do GitHub Actions, detalhados em [docs/ci-cd.md](docs/ci-cd.md):
 
-- **`ci.yml`**: em PRs para `develop`/`main` — kubeconform, Checkov (`k8s/`) e Semgrep
+- **`ci.yml`**: em PRs para `develop`/`main`: kubeconform, Checkov (`k8s/`) e Semgrep
   (`tests/`). Soft-fail (reporta, não bloqueia).
-- **`cd.yml`**: em push para `main` — sobe um cluster `kind` efêmero, aplica os
+- **`cd.yml`**: em push para `main`: sobe um cluster `kind` efêmero, aplica os
   manifests, espera tudo ficar `Ready`, roda `pytest` (incluindo o teste automatizado de
   persistência). Hard-fail.
 
 O `cd.yml`, rodando num cluster efêmero de verdade, pegou uma lacuna real de
 reprodutibilidade que só existia porque o cluster de desenvolvimento nunca tinha sido
-recriado do zero — ver [o caso completo](docs/ci-cd.md#caso-real-o-passo-que-só-existia-no-meu-terminal).
+recriado do zero. Ver [o caso completo](docs/ci-cd.md#caso-real-o-passo-que-só-existia-no-meu-terminal).
 
 ## 🔀 GitFlow
 
 `main` (protegida, só recebe PR de `develop`), `develop` (integração) e uma branch
 `feature/*`/`fix/*`/`chore/*` por entrega, cada uma com seu próprio PR:
 
-Cada etapa — infraestrutura do banco, credenciais, API, escala, segurança, CI/CD — foi
+Cada etapa (infraestrutura do banco, credenciais, API, escala, segurança, CI/CD) foi
 integrada por um PR próprio, com o raciocínio registrado na descrição. Histórico completo
 em [Pull Requests](https://github.com/MeloJu/k8s-postgrest-challenge/pulls?q=is%3Apr+is%3Amerged).
 

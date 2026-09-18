@@ -1,16 +1,16 @@
-# 4 — API conectada ao banco
+# 4. API conectada ao banco
 
 ## Modelo de acesso
 
 O PostgREST expõe o schema do banco como API REST, então o controle do que a API permite
-é feito com papéis do PostgreSQL — não com código. A configuração usa dois papéis, como
+é feito com papéis do PostgreSQL, não com código. A configuração usa dois papéis, como
 recomenda a documentação oficial do PostgREST:
 
 | Papel | Atributos | Privilégios |
 |---|---|---|
 | `authenticator` | `LOGIN`, `NOINHERIT` | nenhum por si só; só pode assumir `web_anon` |
 | `web_anon` | `NOLOGIN` | `SELECT`, `INSERT` em `todos` e `USAGE` na sequência |
-| `desafio_user` | superusuário, dono do banco | apenas bootstrap/administração — a API não o usa |
+| `desafio_user` | superusuário, dono do banco | apenas bootstrap/administração; a API não o usa |
 
 A API conecta como `authenticator`, que não tem privilégio nenhum, e o PostgREST faz
 `SET ROLE web_anon` para requisições não autenticadas. `NOINHERIT` garante que privilégio
@@ -22,7 +22,7 @@ Consequência prática, verificada por [teste automatizado](../tests/test_persis
 requisição anônima.
 
 Os papéis são criados no `init.sh` do
-[ConfigMap](../k8s/02-postgres-configmap.yaml), junto com a tabela — o cluster nasce com
+[ConfigMap](../k8s/02-postgres-configmap.yaml), junto com a tabela, então o cluster nasce com
 esse modelo aplicado, sem passo manual.
 
 ![Papéis criados, POST aceito e DELETE recusado pelo banco](evidencias/nivel-4-privilegio-minimo.png)
@@ -30,7 +30,7 @@ esse modelo aplicado, sem passo manual.
 ## Conexão pelo Service, não por IP
 
 A string de conexão em [`k8s/01-postgres-secret.yaml`](../k8s/01-postgres-secret.yaml)
-usa `postgres` como host — o nome do Service criado no
+usa `postgres` como host, que é o nome do Service criado no
 [nível 2](nivel-2-postgres-pvc.md):
 
 ```
