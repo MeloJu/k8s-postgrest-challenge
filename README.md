@@ -89,26 +89,26 @@ Por que as versões estão fixadas por digest e não por tag: ver
 ```bash
 git clone https://github.com/MeloJu/k8s-postgrest-challenge.git
 cd k8s-postgrest-challenge
-kind create cluster --name k8s-challenge   # pule se já tiver um cluster
+./scripts/setup.sh
+```
+
+O script cria o cluster `kind` (se não existir), instala o `metrics-server` e aplica os
+manifests, aguardando tudo ficar pronto. É idempotente.
+
+Se você já tem um cluster com `metrics-server`, a aplicação sobe com um comando:
+
+```bash
 kubectl apply -f k8s/
-kubectl get pods -n desafio-k8s -w         # espere tudo ficar Running/Ready
 ```
 
 Ver [`k8s/README.md`](k8s/README.md) para o papel de cada manifest e a ordem de aplicação.
 
-### HPA (opcional)
+### Camada de plataforma
 
-O HorizontalPodAutoscaler depende do `metrics-server`, que não vem instalado por padrão
-no `kind`:
-
-```bash
-kubectl apply -f https://github.com/kubernetes-sigs/metrics-server/releases/download/v0.9.0/components.yaml
-kubectl patch deployment metrics-server -n kube-system --type=json \
-  -p '[{"op": "add", "path": "/spec/template/spec/containers/0/args/-", "value": "--kubelet-insecure-tls"}]'
-```
-
-(A flag `--kubelet-insecure-tls` é necessária porque o `kind` usa certificados
-autoassinados nos kubelets — sem ela, o `metrics-server` sobe mas nunca reporta métricas.)
+O `metrics-server` é dependência do HPA e **não** está em `k8s/`: é componente do cluster,
+não da aplicação — em clusters gerenciados (EKS, GKE, AKS) normalmente já vem instalado.
+O procedimento fica em [`scripts/install-metrics-server.sh`](scripts/install-metrics-server.sh),
+usado tanto pelo setup local quanto pelo pipeline de CD.
 
 -----
 
@@ -164,12 +164,11 @@ ele reconecta sozinho — comportamento documentado em
 ### Escalonamento automático
 
 ```bash
-kubectl run load-generator -n desafio-k8s --image=busybox:stable --restart=Never -- \
-  /bin/sh -c "for i in 1 2 3 4; do (while true; do wget -q -O- http://postgrest:3000/todos > /dev/null; done) & done; wait"
-kubectl get hpa -n desafio-k8s -w   # observe REPLICAS subindo
-kubectl delete pod load-generator -n desafio-k8s
-kubectl get hpa -n desafio-k8s -w   # observe REPLICAS voltando ao mínimo
+./scripts/load-test.sh
 ```
+
+Sobe um gerador de carga dentro do cluster, acompanha o HPA aumentando as réplicas e, ao
+final, remove a carga e mostra a redução de volta ao mínimo.
 
 ### Teste automatizado (o mesmo que o CD roda)
 
@@ -253,7 +252,8 @@ k8s-postgrest-challenge/
 │   ├── 📄 hardening-producao.md  # segurança e reprodutibilidade
 │   ├── 📄 ci-cd.md
 │   └── 📂 evidencias/        # saídas de terminal reais referenciadas pelos docs
-├── 📂 tests/                 # pytest: teste automatizado de persistência
+├── 📂 scripts/               # setup do ambiente e teste de carga
+├── 📂 tests/                 # pytest: persistência, privilégio e métricas do HPA
 └── 📂 .github/workflows/     # ci.yml (soft-fail) e cd.yml (hard-fail)
 ```
 

@@ -54,10 +54,16 @@ spec:
             limits:
               cpu: 500m
               memory: 256Mi
+          # A primeira inicialização roda o initdb e o script de schema; a startupProbe
+          # dá essa janela sem afrouxar a liveness em regime normal.
+          startupProbe:
+            exec:
+              command: ["pg_isready", "-U", "desafio_user", "-d", "desafio_db"]
+            periodSeconds: 3
+            failureThreshold: 40
           livenessProbe:
             exec:
               command: ["pg_isready", "-U", "desafio_user", "-d", "desafio_db"]
-            initialDelaySeconds: 15
             periodSeconds: 10
           readinessProbe:
             exec:

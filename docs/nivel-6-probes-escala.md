@@ -6,8 +6,15 @@ Ambos os Deployments declaram liveness e readiness, respondendo a perguntas dife
 
 | | Pergunta | Ação em caso de falha |
 |---|---|---|
+| **Startup** | a aplicação terminou de subir? | mantém liveness e readiness suspensas até passar |
 | **Liveness** | o processo travou? | mata e reinicia o container |
 | **Readiness** | pode receber tráfego agora? | remove o Pod dos endpoints do Service |
+
+A `startupProbe` não é decorativa: sem ela, a liveness da API disparava durante a
+inicialização — o PostgREST responde `503` enquanto ainda negocia a conexão com o banco, e
+três falhas seguidas derrubavam o container com `exit 137` antes de ele terminar de subir.
+Ela dá uma janela generosa de partida sem afrouxar a verificação em regime normal, que é
+exatamente o problema que esse tipo de probe existe para resolver.
 
 Na API ([`k8s/06-postgrest-deployment.yaml`](../k8s/06-postgrest-deployment.yaml)) os
 caminhos são propositalmente diferentes: liveness usa `GET /`, que depende apenas do

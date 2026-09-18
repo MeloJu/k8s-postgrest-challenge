@@ -59,6 +59,31 @@ def test_api_is_reachable(api_url):
     assert resp.status_code == 200
 
 
+def test_hpa_reports_cpu_metrics():
+    """O HPA precisa de métrica real para decidir: `<unknown>` significa inerte."""
+    deadline = time.time() + 180
+    last = None
+    while time.time() < deadline:
+        result = subprocess.run(
+            [
+                "kubectl", "get", "hpa", "postgrest", "-n", NAMESPACE,
+                "-o", "jsonpath={.status.currentMetrics[0].resource.current.averageUtilization}",
+            ],
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+        last = result.stdout.strip()
+        if last.isdigit():
+            return
+        time.sleep(10)
+
+    pytest.fail(
+        f"HPA nao reportou utilizacao de CPU em 180s (valor lido: {last!r}). "
+        "Normalmente indica metrics-server ausente ou sem coletar metricas."
+    )
+
+
 def test_anon_role_cannot_delete(api_url):
     """O papel anônimo tem apenas SELECT/INSERT: DELETE deve ser recusado pelo banco."""
     resp = requests.delete(f"{api_url}/todos", params={"id": "eq.1"}, timeout=10)
