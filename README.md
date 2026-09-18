@@ -25,8 +25,6 @@ pipeline de CI/CD que valida tudo em um cluster criado do zero a cada execução
 Cada decisão de arquitetura está documentada com o raciocínio por trás dela e a evidência
 do comportamento verificado.
 
------
-
 ## 🏗️ Arquitetura
 
 ```mermaid
@@ -43,8 +41,6 @@ host na string de conexão, resolvido via DNS interno do cluster. Isso é o que 
 Pod do banco ser recriado (perdendo IP) sem que a API perca a conexão. Detalhes em
 [API conectada ao banco](docs/nivel-4-postgrest-integracao.md).
 
------
-
 ## 🛠️ Ferramenta de cluster
 
 **[kind](https://kind.sigs.k8s.io/)** (Kubernetes IN Docker), rodando dentro do WSL2
@@ -60,8 +56,6 @@ kind create cluster --name k8s-challenge
 - [`kind`](https://kind.sigs.k8s.io/docs/user/quick-start/#installation)
 - [`kubectl`](https://kubernetes.io/docs/tasks/tools/#kubectl)
 - `curl` (pra testar a API)
-
------
 
 ## 📦 Dependências e versões
 
@@ -81,8 +75,6 @@ kind create cluster --name k8s-challenge
 
 Por que as versões estão fixadas por digest e não por tag: ver
 [segurança e reprodutibilidade](docs/hardening-producao.md#imagens-fixadas-por-digest).
-
------
 
 ## 🚀 Como aplicar
 
@@ -109,8 +101,6 @@ O `metrics-server` é dependência do HPA e **não** está em `k8s/`: é compone
 não da aplicação — em clusters gerenciados (EKS, GKE, AKS) normalmente já vem instalado.
 O procedimento fica em [`scripts/install-metrics-server.sh`](scripts/install-metrics-server.sh),
 usado tanto pelo setup local quanto pelo pipeline de CD.
-
------
 
 ## 🧪 Como testar
 
@@ -177,16 +167,12 @@ pip install -r tests/requirements.txt
 pytest tests/ -v
 ```
 
------
-
 ## 🧹 Limpeza
 
 ```bash
 kubectl delete namespace desafio-k8s
 kind delete cluster --name k8s-challenge   # se quiser remover o cluster inteiro também
 ```
-
------
 
 ## 📚 Documentação
 
@@ -217,8 +203,6 @@ seções técnicas:
 | Qual a diferença prática entre liveness e readiness? | [Probes](docs/nivel-6-probes-escala.md#probes) |
 | Por que escalar a API é seguro e escalar o banco com o mesmo PVC não é? | [Por que o banco não escala do mesmo jeito](docs/nivel-6-probes-escala.md#por-que-o-banco-não-escala-do-mesmo-jeito) |
 
------
-
 ## 🔐 Segurança
 
 - **Privilégio mínimo no banco**: a API conecta com um papel sem privilégios
@@ -240,8 +224,6 @@ As credenciais versionadas são de demonstração: o banco é local, sem exposi�
 o papel usado pela API é o de privilégio mínimo acima. Em um ambiente com dados reais,
 elas viriam do pipeline de deploy ou de um gestor externo de segredos.
 
------
-
 ## 📁 Estrutura do repositório
 
 ```
@@ -257,8 +239,6 @@ k8s-postgrest-challenge/
 └── 📂 .github/workflows/     # ci.yml (soft-fail) e cd.yml (hard-fail)
 ```
 
------
-
 ## ⚙️ CI/CD
 
 Dois workflows do GitHub Actions, detalhados em [docs/ci-cd.md](docs/ci-cd.md):
@@ -273,8 +253,6 @@ O `cd.yml`, rodando num cluster efêmero de verdade, pegou uma lacuna real de
 reprodutibilidade que só existia porque o cluster de desenvolvimento nunca tinha sido
 recriado do zero — ver [o caso completo](docs/ci-cd.md#caso-real-o-passo-que-só-existia-no-meu-terminal).
 
------
-
 ## 🔀 GitFlow
 
 `main` (protegida, só recebe PR de `develop`), `develop` (integração) e uma branch
@@ -283,8 +261,6 @@ recriado do zero — ver [o caso completo](docs/ci-cd.md#caso-real-o-passo-que-s
 Cada etapa — infraestrutura do banco, credenciais, API, escala, segurança, CI/CD — foi
 integrada por um PR próprio, com o raciocínio registrado na descrição. Histórico completo
 em [Pull Requests](https://github.com/MeloJu/k8s-postgrest-challenge/pulls?q=is%3Apr+is%3Amerged).
-
------
 
 ## 👤 Autor
 
