@@ -234,7 +234,7 @@ k8s-postgrest-challenge/
 │   ├── 📄 hardening-producao.md  # segurança e reprodutibilidade
 │   ├── 📄 ci-cd.md
 │   └── 📂 evidencias/        # saídas de terminal reais referenciadas pelos docs
-├── 📂 scripts/               # setup do ambiente e teste de carga
+├── 📂 scripts/               # camada de plataforma (ver scripts/README.md)
 ├── 📂 tests/                 # pytest: persistência, privilégio e métricas do HPA
 └── 📂 .github/workflows/     # ci.yml (soft-fail) e cd.yml (hard-fail)
 ```
