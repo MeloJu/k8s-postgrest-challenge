@@ -99,8 +99,21 @@ Ver [`k8s/README.md`](k8s/README.md) para o papel de cada manifest e a ordem de 
 
 O `metrics-server` é dependência do HPA e **não** está em `k8s/`: é componente do cluster,
 não da aplicação, e em clusters gerenciados (EKS, GKE, AKS) normalmente já vem instalado.
-O procedimento fica em [`scripts/install-metrics-server.sh`](scripts/install-metrics-server.sh),
-usado tanto pelo setup local quanto pelo pipeline de CD.
+
+Se o seu cluster ainda não tem, são dois comandos:
+
+```bash
+kubectl apply -f https://github.com/kubernetes-sigs/metrics-server/releases/download/v0.9.0/components.yaml
+
+# necessário apenas no kind, que usa certificados autoassinados nos kubelets
+kubectl patch deployment metrics-server -n kube-system --type=json \
+  -p '[{"op": "add", "path": "/spec/template/spec/containers/0/args/-", "value": "--kubelet-insecure-tls"}]'
+```
+
+Esses mesmos comandos estão em
+[`scripts/install-metrics-server.sh`](scripts/install-metrics-server.sh), usado pelo
+`setup.sh` e pelo pipeline de CD para o procedimento não divergir entre documentação e
+automação.
 
 ## 🧪 Como testar
 
@@ -159,6 +172,21 @@ ele reconecta sozinho, comportamento documentado em
 
 Sobe um gerador de carga dentro do cluster, acompanha o HPA aumentando as réplicas e, ao
 final, remove a carga e mostra a redução de volta ao mínimo.
+
+Sem o script, os mesmos passos manualmente:
+
+```bash
+kubectl run load-generator -n desafio-k8s --image=busybox:stable --restart=Never -- \
+  /bin/sh -c "for i in 1 2 3 4; do (while true; do wget -q -O- http://postgrest:3000/todos > /dev/null; done) & done; wait"
+
+kubectl get hpa -n desafio-k8s -w      # réplicas sobem conforme a CPU passa de 50%
+
+kubectl delete pod load-generator -n desafio-k8s
+kubectl get hpa -n desafio-k8s -w      # réplicas voltam ao mínimo
+```
+
+O HPA precisa do `metrics-server` para sair de `<unknown>`; ver
+[camada de plataforma](#camada-de-plataforma).
 
 ### Teste automatizado (o mesmo que o CD roda)
 
