@@ -55,11 +55,18 @@ spec:
             limits:
               cpu: 250m
               memory: 128Mi
+          # Segura liveness e readiness até a API terminar de subir e conectar no banco.
+          # Sem isto, a liveness mata o container durante a inicialização (exit 137).
+          startupProbe:
+            httpGet:
+              path: /
+              port: 3000
+            periodSeconds: 2
+            failureThreshold: 30
           livenessProbe:
             httpGet:
               path: /
               port: 3000
-            initialDelaySeconds: 5
             periodSeconds: 10
           readinessProbe:
             httpGet:
