@@ -29,7 +29,7 @@ esse modelo aplicado, sem passo manual.
 
 ## Conexão pelo Service, não por IP
 
-A string de conexão em [`k8s/01-postgres-secret.yaml`](../k8s/01-postgres-secret.yaml)
+A string de conexão em [`k8s/01-postgres-secret.example.yaml`](../k8s/01-postgres-secret.example.yaml)
 usa `postgres` como host, que é o nome do Service criado no
 [nível 2](nivel-2-postgres-pvc.md):
 

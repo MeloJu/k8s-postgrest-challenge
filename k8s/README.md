@@ -1,7 +1,7 @@
 # Manifests
 
 > **A numeração destes arquivos é ordem de aplicação, não ordem dos níveis do desafio.**
-> `01-postgres-secret.yaml` vem antes de `04-postgres-deployment.yaml` porque o Deployment
+> `01-postgres-secret.example.yaml` vem antes de `04-postgres-deployment.yaml` porque o Deployment
 > consome o Secret, não porque um seja de um nível anterior. A coluna "Documentação" na
 > tabela abaixo liga cada manifest ao documento correspondente.
 
@@ -12,7 +12,7 @@ de quem a consome, banco antes da API.
 | Arquivo | Nível | Recurso | Documentação |
 |---|---|---|---|
 | `00-namespace.yaml` | 1 | Namespace `desafio-k8s` | [Namespace](../docs/nivel-1-namespace-pod.md) |
-| `01-postgres-secret.yaml` | 3 | Secret: senhas e configuração do PostgREST | [Credenciais](../docs/nivel-3-secret-configmap.md) |
+| `01-postgres-secret.example.yaml` | 3 | Secret: senhas e configuração do PostgREST | [Credenciais](../docs/nivel-3-secret-configmap.md) |
 | `02-postgres-configmap.yaml` | 3 | ConfigMap: configuração e script de inicialização | [Credenciais](../docs/nivel-3-secret-configmap.md) |
 | `03-postgres-pvc.yaml` | 2 | PersistentVolumeClaim do banco | [Armazenamento](../docs/nivel-2-postgres-pvc.md) |
 | `04-postgres-deployment.yaml` | 2, 6 | Deployment do PostgreSQL (probes e limites no 6) | [Armazenamento](../docs/nivel-2-postgres-pvc.md) |
