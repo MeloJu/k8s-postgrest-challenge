@@ -5,3 +5,7 @@ __pycache__/
 *.pyc
 .pytest_cache/
 .venv/
+
+# O Secret versionado é o .example. Se alguém copiar o arquivo para o nome sem o
+# sufixo e preencher com credenciais reais, ele não sobe para o Git.
+k8s/01-postgres-secret.yaml

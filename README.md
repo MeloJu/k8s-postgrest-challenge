@@ -248,9 +248,13 @@ seções técnicas:
 Detalhes e raciocínio em
 [segurança e reprodutibilidade](docs/hardening-producao.md).
 
-As credenciais versionadas são de demonstração: o banco é local, sem exposição externa, e
-o papel usado pela API é o de privilégio mínimo acima. Em um ambiente com dados reais,
-elas viriam do pipeline de deploy ou de um gestor externo de segredos.
+As credenciais versionadas são de demonstração, e o nome do arquivo
+([`k8s/01-postgres-secret.example.yaml`](k8s/01-postgres-secret.example.yaml)) declara isso.
+Ele é versionado de propósito para que `kubectl apply -f k8s/` funcione em um clone novo sem
+passo manual: o banco é local, sem exposição externa, e o papel usado pela API é o de
+privilégio mínimo acima. Em um ambiente com dados reais o valor viria do pipeline de deploy
+ou de um gestor externo, substituindo o conteúdo do arquivo sem tocar em nenhum outro
+manifest, porque o nome do objeto (`postgres-secret`) não muda.
 
 ## 📁 Estrutura do repositório
 

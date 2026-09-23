@@ -11,7 +11,7 @@ sensível: nome do banco, usuário, caminho do `PGDATA` e o script de inicializa
 
 ## Secret
 
-[`k8s/01-postgres-secret.yaml`](../k8s/01-postgres-secret.yaml) guarda três valores: a
+[`k8s/01-postgres-secret.example.yaml`](../k8s/01-postgres-secret.example.yaml) guarda três valores: a
 senha do usuário dono do banco, a senha do papel `authenticator` usado pela API, e o
 arquivo de configuração do PostgREST (que contém a string de conexão).
 
@@ -53,15 +53,16 @@ acesso por outros mecanismos:
 
 ## Credenciais neste repositório
 
-As credenciais versionadas aqui são de demonstração e existem para que
-`kubectl apply -f k8s/` funcione em qualquer clone sem passo manual, prática comum em
-repositórios de referência. Elas não dão acesso a nenhum recurso real: o banco é local,
-sem exposição externa, e o papel usado pela API tem privilégio mínimo
-([nível 4](nivel-4-postgrest-integracao.md)).
+O arquivo se chama `01-postgres-secret.example.yaml`: o sufixo sinaliza que os valores são de
+demonstração, e a extensão `.yaml` é mantida de propósito para que `kubectl apply -f k8s/`
+continue funcionando em qualquer clone sem passo manual. As credenciais não dão acesso a
+nenhum recurso real: o banco é local, sem exposição externa, e o papel usado pela API tem
+privilégio mínimo ([nível 4](nivel-4-postgrest-integracao.md)).
 
-Em um ambiente com dados reais, o valor não iria para o Git: o pipeline injetaria a
-credencial no momento do deploy, ou o cluster a buscaria de um gestor externo, mantendo
-no repositório apenas a referência.
+O nome do objeto (`postgres-secret`) é o que os Deployments referenciam, então o arquivo é
+substituível sem tocar em nenhum outro manifest. Em um ambiente com dados reais o valor não
+iria para o Git: o pipeline injetaria a credencial no momento do deploy, ou o cluster a
+buscaria de um gestor externo, mantendo no repositório apenas a referência.
 
 ## Evidência
 
